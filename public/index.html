@@ -138,6 +138,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rep .card{margin:0;display:flex;flex-direction:column;gap:8px}.rep .card p{margin:0;font-size:13px;color:var(--mut);flex:1}
 .mx td{text-align:center}.mx td:first-child{text-align:left}
 .mx input{width:20px;height:20px;min-height:0;accent-color:var(--g2)}
+.sug{position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0003;max-height:320px;overflow:auto;display:none;margin-top:4px}.sug button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:8px 12px;cursor:pointer;font-size:14px;font-weight:400;color:var(--ink)}.sug button:hover,.sug button:focus{background:var(--sel)}.sug small{color:var(--mut)}
 .banner{background:light-dark(#fff6e8,#3a2c14);border-bottom:1px solid light-dark(#efd3a3,#6b5226);padding:8px 18px;font-size:13px;display:none}
 @media(max-width:900px){.wrap{grid-template-columns:1fr}aside{position:fixed;left:0;top:56px;width:260px;z-index:40;transform:translateX(-105%);transition:transform .2s;box-shadow:4px 0 20px #0003}
 aside.open{transform:none}.menu-btn{display:block}.brand small{display:none}.g4c{grid-template-columns:repeat(2,minmax(0,1fr))}.span3{grid-column:span 2}}
@@ -223,6 +224,7 @@ function applies(dev,serv){const m=CFG.matriz[dev]||[];return m.includes('*')||m
 function saveLocal(){if(mode!=='local')return;try{localStorage.setItem('sestah_v1',JSON.stringify({CFG,CAT,store}))}catch(e){}}
 function loadLocal(){try{const j=JSON.parse(localStorage.getItem('sestah_v1')||'null');if(j){CFG=Object.assign(clone(DEF),j.CFG);CAT=j.CAT||CAT;Object.assign(store,j.store)}}catch(e){}}
 async function put(col,id,data){
+ if(mode==='offline'||mode==='init'){toast('Sin conexión con el servidor: no se guardó. Pulse Reintentar.');connErrModal('No hay conexión activa con el servidor de datos.');throw new Error('offline')}
  if(col==='config'){if(id==='main')CFG=data;else CAT=data}else store[col][id]=data;
  render(true);
  if(db){try{await db.collection(col).doc(id).set(data)}catch(e){toast(e.code==='quota_exceeded'?'Capacidad de almacenamiento agotada: depure registros antiguos.':'No se pudo guardar ('+(e.code||'error')+'). Verifique sus permisos.');throw e}}
@@ -235,7 +237,19 @@ let netKey='',netTimer=null;
 function lsGet(k){try{return localStorage.getItem(k)||''}catch(e){return''}}
 function lsSet(k,v){try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}}
 function fileDL(){return{save:async({filename,data})=>{const b=data instanceof Blob?data:new Blob([data]);const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);return{status:'saved'}}}}
-async function netFetch(){const r=await fetch('/api/data',{headers:{'x-sestah-clave':netKey},cache:'no-store'});if(r.status===401)return 401;if(!r.ok)throw new Error('http '+r.status);return r.json()}
+async function netFetch(cat=true){const r=await fetch('/api/data'+(cat?'':'?catalogo=0'),{headers:{'x-sestah-clave':netKey},cache:'no-store'});if(r.status===401)return 401;if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error||('HTTP '+r.status));e.status=r.status;throw e}return r.json()}
+async function diagnose(err){
+ if(location.protocol==='file:')return'La aplicación se abrió como archivo local. Debe abrirse desde su dirección de Netlify.';
+ let r,j={};try{r=await fetch('/api/estado',{cache:'no-store'});j=await r.json().catch(()=>({}))}catch(e){return'No hay conexión a internet o el sitio no responde. Verifique su red y reintente.'}
+ if(r.status===404||!j.funcion)return'El servidor de datos no está desplegado. En GitHub, netlify.toml y package.json deben estar en la raíz del repositorio, junto a las carpetas public y netlify (con netlify/functions/api.mjs). Corrija la estructura y Netlify volverá a publicar.';
+ const f=[];if(!j.claveSupervision)f.push('SESTAH_CLAVE');if(!j.claveAdministracion)f.push('SESTAH_CLAVE_ADMIN');
+ if(f.length)return'Faltan las variables de entorno '+f.join(' y ')+' en Netlify, o se crearon sin volver a desplegar. Cree las variables en Project configuration > Environment variables (alcance Functions) y luego Deploys > Trigger deploy > Deploy project.';
+ if(j.almacenamiento!=='ok')return'El almacenamiento de datos (Netlify Blobs) respondió con error: '+j.almacenamiento+'. Vuelva a desplegar con Deploys > Trigger deploy > Clear cache and deploy project.';
+ return'El servidor respondió con error: '+(err?.message||'desconocido')+'. Revise Logs > Functions > api en Netlify.';
+}
+function connErrModal(msg){setConn('Sin conexión');banner('Sin conexión con el servidor: no se guardará ninguna captura hasta restablecerla.');
+ openModal(`<h2>No se pudo conectar con el servidor</h2><div class="err">${esc(msg)}</div><p class="hint">Por seguridad, la aplicación no permite capturar sin conexión: los datos quedarían solo en este navegador.</p><div class="row" style="margin-top:14px"><button class="btn pri" id="cx_r">Reintentar</button><button class="btn" id="cx_k">Cambiar clave de acceso</button></div>`,()=>{
+  $('#cx_r').onclick=()=>{closeModal();netStart()};$('#cx_k').onclick=()=>{lsSet('sestah_clave','');netKey='';closeModal();keyModal()}})}
 function netApply(j){canAdmin=!!j.admin;const c=j.config||{};if(c.main)CFG=Object.assign(clone(DEF),c.main);if(c.catalogo)CAT=c.catalogo;['cuestionarios','alertas','perfiles'].forEach(k=>store[k]=j[k]||{})}
 function keyModal(msg){
  openModal(`<h2>Acceso al sistema</h2><p class="hint">Capture la clave de acceso proporcionada por el Departamento de Supervisión y Desarrollo en Salud.</p>${msg?`<div class="err">${esc(msg)}</div>`:''}
@@ -244,10 +258,11 @@ function keyModal(msg){
 }
 async function netStart(){
  if(!netKey){keyModal();return}
- let j;try{j=await netFetch()}catch(e){mode='local';loadLocal();setConn('Modo local');banner('No se pudo conectar con el servidor de la aplicación. Los datos se guardan solo en este navegador.');render();askPerf();return}
+ setConn('Conectando…');
+ let j;try{j=await netFetch()}catch(e){mode='offline';render();connErrModal(await diagnose(e));return}
  if(j===401){lsSet('sestah_clave','');netKey='';keyModal('Clave de acceso inválida.');return}
  lsSet('sestah_clave',netKey);mode='net';netApply(j);setConn(canAdmin?'Conectado · Administración':'Conectado');banner('');render();askPerf();
- clearInterval(netTimer);netTimer=setInterval(async()=>{if(document.hidden)return;try{const x=await netFetch();if(x!==401){netApply(x);render(true)}}catch(e){setConn('Sin conexión')}},45000);
+ clearInterval(netTimer);netTimer=setInterval(async()=>{if(document.hidden)return;try{const x=await netFetch(false);if(x!==401){netApply(x);render(true)}}catch(e){setConn('Sin conexión')}},45000);
 }
 function setConn(t){$('#conn').textContent=t}
 function banner(t){const b=$('#banner');b.textContent=t||'';b.style.display=t?'block':'none'}
@@ -476,6 +491,7 @@ function addClave(k){
  const rows=$('#q2rows');if(rows.children.length>=5){toast('Máximo cinco claves prioritarias.');return}
  const d=document.createElement('div');d.className='clave';
  d.innerHTML=`<div class="clhead"><b>Clave prioritaria</b><span class="rk"></span><button class="lnk" data-rm>Quitar</button></div><div class="g4c">
+ <label class="span4" style="position:relative">Buscar insumo en el catálogo (nombre o clave)<input class="f-buscar" autocomplete="off" placeholder="${(CAT.items||[]).length?'Escriba al menos 3 letras, por ejemplo: paracetamol':'Cargue el archivo de claves en Catálogo de Insumos para habilitar la búsqueda'}"><div class="sug"></div></label>
  <label>Grupo de insumo<select class="f-grupo">${grupos().map(g=>`<option>${g}</option>`).join('')}</select></label>
  <label>Clave institucional<input class="f-clave mono" list="dl_cat" placeholder="000.000.0000.00"></label>
  <label class="span2">Descripción<input class="f-desc"></label>
@@ -491,8 +507,23 @@ function addClave(k){
  <label class="span2">Justificación de la prioridad<input class="f-just"></label></div>`;
  rows.appendChild(d);
  clFields.forEach(f=>{const e=d.querySelector('.f-'+f);if(k[f]!=null&&e)e.value=k[f]});
- d.querySelector('[data-rm]').onclick=()=>{d.remove();rank()};rank();
+ d.querySelector('[data-rm]').onclick=()=>{d.remove();rank()};
+ const bi=d.querySelector('.f-buscar'),sg=d.querySelector('.sug');let res=[];
+ bi.addEventListener('input',e=>{e.stopPropagation();res=searchCat(bi.value);
+  sg.innerHTML=res.length?res.map((it,k)=>`<button type="button" data-k="${k}"><b class="mono">${esc(it.clave)}</b> · ${esc(it.desc)}<br><small>${esc(it.pres||'')}${it.grupo?' · '+esc(it.grupo):''}${it.critico==='Sí'?' · crítico':''}</small></button>`).join(''):(bi.value.trim().length>=3?'<div class="hint" style="padding:8px 12px;margin:0">Sin coincidencias en el catálogo.</div>':'');
+  sg.style.display=sg.innerHTML?'block':'none'});
+ bi.addEventListener('keydown',e=>{if(e.key==='Enter'&&res[0]){e.preventDefault();pick(res[0])}if(e.key==='Escape')sg.style.display='none'});
+ bi.addEventListener('blur',()=>setTimeout(()=>sg.style.display='none',250));
+ sg.addEventListener('mousedown',e=>{const b=e.target.closest('button');if(b){e.preventDefault();pick(res[+b.dataset.k])}});
+ function pick(it){if(!it)return;d.querySelector('.f-clave').value=it.clave;d.querySelector('.f-desc').value=it.desc;d.querySelector('.f-pres').value=it.pres||'';
+  if(grupos().includes(it.grupo))d.querySelector('.f-grupo').value=it.grupo;bi.value='';sg.style.display='none';rank();d.querySelector('.f-exist').focus()}
+ rank();
 }
+const normTxt=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function catIndex(){const it=CAT.items||[];if(catIndex.src!==it){catIndex.src=it;catIndex.v=it.map(i=>normTxt(i.clave+' '+i.desc+' '+(i.pres||'')))}return catIndex.v}
+function searchCat(q){q=normTxt(q).trim();if(q.length<3)return[];const tk=q.split(/\s+/),idx=catIndex(),it=CAT.items||[],out=[];
+ for(let i=0;i<idx.length&&out.length<60;i++){if(tk.every(t=>idx[i].includes(t)))out.push(it[i])}
+ return out.sort((a,b)=>(normTxt(b.desc).startsWith(q)-normTxt(a.desc).startsWith(q))||String(a.desc).length-String(b.desc).length).slice(0,12)}
 function readClaves(){return $$('#q2rows .clave').map(d=>{const o={};clFields.forEach(f=>{const v=d.querySelector('.f-'+f).value;o[f]=['exist','cons','nec','dias'].includes(f)?num(v):v.trim()});return o})}
 function rank(){
  const rows=$$('#q2rows .clave');if(!rows.length){$('#rank')&&($('#rank').innerHTML='');return}
@@ -726,6 +757,9 @@ function vCatalogo(){
  const top=Object.values(freq).sort((a,b)=>b.n-a.n).slice(0,15);
  $('#main').innerHTML=ph('Catálogo de Insumos','Claves institucionales de referencia para la captura y frecuencia de faltantes reportados')+
  `<div class="card"><h3>Claves faltantes más reportadas</h3>${top.length?`<table class="stack"><thead><tr><th>Clave</th><th>Descripción</th><th>Grupo</th><th class="n">Reportes</th><th class="n">Sin sustituto</th><th class="n">Servicios</th></tr></thead><tbody>${top.map(t=>`<tr><td class="mono">${esc(t.clave)}</td><td>${esc(t.desc)}</td><td>${esc(t.grupo)}</td><td class="n">${t.n}</td><td class="n">${t.sin}</td><td class="n">${t.serv.size}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aún no hay claves faltantes reportadas.</div>'}</div>
+ ${ed?`<div class="card"><h3>Cargar archivo de claves</h3><p class="hint">Archivo Excel (.xlsx, .xls) o CSV con al menos las columnas de clave y descripción; presentación, grupo y crítico son opcionales. Si no hay columna de grupo se infiere por la clave: 010, 020, 030 y 040 = Medicamento; 060 = Material de curación; otras = Otro insumo. Al cargarlo, en el cuestionario basta buscar el nombre del insumo para precargar clave, descripción, presentación y grupo.</p>
+ ${CAT.fuente?`<p class="hint"><b>Catálogo vigente:</b> ${esc(CAT.fuente)} · ${(CAT.items||[]).length} claves · ${esc(fmtDT(CAT.actualizado))}</p>`:''}
+ <input type="file" id="c_file" accept=".xlsx,.xls,.csv" style="max-width:420px;margin-top:8px"><div id="c_map"></div></div>`:''}
  <div class="card"><h3>Catálogo de referencia (${items.length} claves)</h3>
  ${ed?`<div class="g4c"><label>Grupo<select id="c_g"><option>Medicamento</option><option>Material de curación</option></select></label><label>Clave institucional<input id="c_k" class="mono"></label><label class="span2">Descripción<input id="c_d"></label><label>Presentación<input id="c_p"></label><label>¿Insumo crítico?<select id="c_c"><option>No</option><option>Sí</option></select></label><div style="align-self:end"><button class="btn pri" id="c_add">Agregar clave</button></div></div>
  <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Carga masiva (pegar desde Excel)</summary><p class="hint">Una clave por renglón con columnas separadas por tabulador o punto y coma: clave; descripción; presentación; grupo (Medicamento / Material de curación); crítico (Sí/No).</p><textarea id="c_bulk" rows="6"></textarea><button class="btn sm" id="c_load" style="margin-top:8px">Cargar renglones</button></details>`:'<p class="hint">Solo lectura. La administración del catálogo corresponde a personas con permiso de edición.</p>'}
@@ -736,10 +770,41 @@ function vCatalogo(){
   $$('[data-del]').forEach(b=>b.onclick=()=>{CAT.items=items.filter(x=>x.clave!==b.dataset.del);put('config','catalogo',CAT).catch(()=>{})})};
  $('#c_q').oninput=draw;draw();
  if(!ed)return;
+ $('#c_file').onchange=e=>{const f=e.target.files[0];if(f)importCat(f)};
  $('#c_add').onclick=()=>{const k=$('#c_k').value.trim(),d=$('#c_d').value.trim();if(!k||!d){toast('Capture clave y descripción.');return}CAT.items=[...items.filter(x=>x.clave!==k),{clave:k,desc:d,pres:$('#c_p').value.trim(),grupo:$('#c_g').value,critico:$('#c_c').value}];put('config','catalogo',CAT).catch(()=>{})};
  $('#c_load').onclick=()=>{const rows=$('#c_bulk').value.split(/\r?\n/).map(l=>l.split(/\t|;/).map(x=>x.trim())).filter(r=>r[0]&&r[1]);const m=new Map(items.map(i=>[i.clave,i]));rows.forEach(r=>m.set(r[0],{clave:r[0],desc:r[1],pres:r[2]||'',grupo:/cura/i.test(r[3]||'')?'Material de curación':'Medicamento',critico:/^s/i.test(r[4]||'')?'Sí':'No'}));CAT.items=[...m.values()];if(JSON.stringify(CAT).length>240000){toast('El catálogo excede la capacidad de un documento; cargue solo claves prioritarias.');return}put('config','catalogo',CAT).then(()=>toast(rows.length+' renglones procesados.')).catch(()=>{})};
 }
 
+function grupoDe(v,clave){const t=normTxt(v);if(/cura/.test(t))return'Material de curación';if(/medic|farmac/.test(t))return'Medicamento';
+ const p=String(clave).trim().slice(0,3);if(['010','020','030','040'].includes(p))return'Medicamento';if(p==='060')return'Material de curación';return v?String(v).trim():'Otro insumo'}
+async function importCat(file){
+ const box=$('#c_map');if(!window.XLSX){box.innerHTML='<div class="err">No se cargó el lector de Excel. Recargue la página e intente de nuevo.</div>';return}
+ box.innerHTML='<p class="hint">Leyendo archivo…</p>';
+ let wb;try{wb=XLSX.read(await file.arrayBuffer(),{type:'array'})}catch(e){box.innerHTML='<div class="err">No se pudo leer el archivo. Verifique que sea Excel o CSV.</div>';return}
+ const draw=sn=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
+  let hr=rows.slice(0,40).findIndex(r=>r.some(c=>/clave/i.test(c))&&r.some(c=>/descrip|nombre|denominac|insumo/i.test(c)));if(hr<0)hr=0;
+  const H=(rows[hr]||[]).map((c,i)=>String(c).trim()||('Columna '+(i+1)));
+  const g=re=>H.findIndex(h=>re.test(h));
+  const m={clave:g(/^clave$|clave (del )?(cuadro|cnis|insumo|institucional)|^clave/i),desc:g(/descrip|nombre|denominac|insumo/i),pres:g(/present/i),grupo:g(/grupo|tipo|partida|categor|clasif/i),crit:g(/cr[ií]tic/i)};
+  const sel=(k,lab,opt)=>`<label>${lab}<select data-m="${k}">${opt?'<option value="-1">(no incluir)</option>':''}${H.map((h,i)=>`<option value="${i}" ${m[k]===i?'selected':''}>${esc(h)}</option>`).join('')}</select></label>`;
+  box.innerHTML=`<div class="g4c" style="margin-top:12px">${wb.SheetNames.length>1?`<label>Hoja<select id="c_sh">${wb.SheetNames.map(n=>`<option ${n===sn?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
+  ${sel('clave','Columna de clave')}${sel('desc','Columna de descripción')}${sel('pres','Columna de presentación',1)}${sel('grupo','Columna de grupo',1)}${sel('crit','Columna de crítico',1)}</div>
+  <p class="hint">Encabezados detectados en el renglón ${hr+1}. Revise que cada columna corresponda.</p><div id="c_prev"></div>
+  <div class="row" style="margin-top:10px"><button class="btn pri" id="c_rep">Reemplazar catálogo</button><button class="btn" id="c_mer">Agregar y actualizar claves</button></div>`;
+  $('#c_sh')&&($('#c_sh').onchange=x=>draw(x.target.value));
+  const build=()=>{const M={};$$('[data-m]').forEach(x=>M[x.dataset.m]=+x.value);const seen=new Map();
+   rows.slice(hr+1).forEach(r=>{const cl=String(r[M.clave]??'').trim(),de=String(r[M.desc]??'').trim().replace(/\s+/g,' ');if(!cl||!de||seen.has(cl))return;
+    seen.set(cl,{clave:cl,desc:de,pres:M.pres>=0?String(r[M.pres]??'').trim():'',grupo:grupoDe(M.grupo>=0?r[M.grupo]:'',cl),critico:M.crit>=0&&/^s/i.test(String(r[M.crit]))?'Sí':'No'})});return[...seen.values()]};
+  const prev=()=>{const it=build();$('#c_prev').innerHTML=`<p class="hint"><b>${it.length}</b> claves válidas listas para cargar (${it.filter(i=>i.grupo==='Medicamento').length} medicamentos, ${it.filter(i=>i.grupo==='Material de curación').length} de material de curación).</p>`+
+   (it.length?`<div class="scroll"><table><thead><tr><th>Clave</th><th>Descripción</th><th>Presentación</th><th>Grupo</th></tr></thead><tbody>${it.slice(0,5).map(i=>`<tr><td class="mono">${esc(i.clave)}</td><td>${esc(i.desc)}</td><td>${esc(i.pres)}</td><td>${esc(i.grupo)}</td></tr>`).join('')}</tbody></table></div>`:'');return it};
+  $$('[data-m]').forEach(x=>x.onchange=prev);prev();
+  const save=async merge=>{const it=build();if(!it.length){toast('No hay claves válidas con la asignación de columnas actual.');return}
+   const all=merge?[...new Map([...(CAT.items||[]).map(i=>[i.clave,i]),...it.map(i=>[i.clave,i])]).values()]:it;
+   const doc={items:all,fuente:file.name,actualizado:new Date().toISOString()};if(JSON.stringify(doc).length>3900000){toast('El catálogo excede la capacidad (unas 25,000 claves). Cargue solo las claves de uso hospitalario.');return}
+   try{await put('config','catalogo',doc);toast(all.length+' claves cargadas en el catálogo.')}catch(x){}};
+  $('#c_rep').onclick=()=>save(false);$('#c_mer').onclick=()=>save(true)};
+ draw(wb.SheetNames[0]);
+}
 /* ============ ALERTAS ============ */
 function vAlertas(){
  let al=As().filter(a=>(!alFil.lv||a.nivel===alFil.lv)&&(!alFil.hosp||a.clues===alFil.hosp)&&(alFil.st==='todas'||(alFil.st==='abiertas'?a.estado!=='Cerrada':a.estado==='Cerrada')));
@@ -919,8 +984,18 @@ function vAdmin(){
  <ul id="mlist" style="padding-left:18px;font-size:14px">${((CFG.modulos||{})[modServ]||[]).map((q,i)=>`<li>${esc(q.texto)} <small>(${{sino:'Sí/No',num:'Número',texto:'Texto'}[q.tipo]})</small> ${ed?`<button class="lnk" data-mq="${i}">Quitar</button>`:''}</li>`).join('')||'<li>Sin preguntas adicionales.</li>'}</ul>
  ${ed?`<div class="row"><input id="mq_t" placeholder="Texto de la pregunta" style="max-width:420px"><select id="mq_k" style="max-width:150px"><option value="sino">Sí/No</option><option value="num">Número</option><option value="texto">Texto</option></select><button class="btn sm" id="mq_a">Agregar pregunta</button></div>`:''}</div>
  <div class="card"><h3>Perfiles registrados</h3><table class="stack"><thead><tr><th>Nombre</th><th>Cargo</th><th>Rol</th><th>Región</th></tr></thead><tbody>${Object.values(store.perfiles).map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.cargo)}</td><td>${esc(p.rol)}</td><td>${esc(p.region)}</td></tr>`).join('')||'<tr><td colspan="4">Sin perfiles.</td></tr>'}</tbody></table></div>
+ ${canCfg()&&mode!=='db'?`<div class="card" style="border-color:var(--g2)"><h3>Reinicio de datos para inicio de operación</h3><p class="hint">Elimina de forma permanente todos los cuestionarios y alertas capturados, incluidas las pruebas (${Qs().length} cuestionarios y ${As().length} alertas en este momento). Conserva carteras de servicios, matriz, umbrales, módulos y catálogo de insumos. No se puede deshacer: descargue antes el respaldo si lo necesita.</p>
+ <label class="opt" style="max-width:560px;margin-top:8px"><input type="checkbox" id="rs_p">Eliminar también los perfiles registrados (cada persona volverá a registrarse al entrar)</label>
+ <label style="max-width:360px;margin-top:10px">Escriba BORRAR para confirmar<input id="rs_c" autocomplete="off"></label><button class="btn pri" id="rs_go" style="margin-top:10px">Eliminar capturas y alertas</button></div>`:''}
  <div class="card"><h3>Respaldo y capacidad</h3><p class="hint">${Qs().length} cuestionarios y ${As().length} alertas cargados en esta vista. El almacenamiento admite hasta 25,000 documentos; programe respaldos periódicos.</p><div class="row"><button class="btn sm" id="bk">Descargar respaldo completo (JSON)</button>${mode==='net'?'<button class="btn sm" id="ko">Cerrar sesión en este equipo</button>':''}</div></div>`;
  $('#ko')&&($('#ko').onclick=()=>{lsSet('sestah_clave','');location.reload()});
+ $('#rs_go')&&($('#rs_go').onclick=async()=>{if($('#rs_c').value.trim()!=='BORRAR'){toast('Escriba BORRAR para confirmar.');return}
+  const perf=$('#rs_p').checked;$('#rs_go').disabled=true;
+  if(mode==='net'){const r=await fetch('/api/reset',{method:'POST',headers:{'content-type':'application/json','x-sestah-clave':netKey},body:JSON.stringify({confirmacion:'BORRAR',perfiles:perf})}).catch(()=>null);
+   const j=r?await r.json().catch(()=>({})):{};if(!r||!r.ok){toast('No se pudo reiniciar: '+(j.error||'sin conexión'));$('#rs_go').disabled=false;return}
+   try{netApply(await netFetch(false))}catch(e){}toast('Datos reiniciados: '+j.eliminados+' registros eliminados.')}
+  else{store.cuestionarios={};store.alertas={};if(perf)store.perfiles={};saveLocal();toast('Datos locales reiniciados.')}
+  perfAsked=false;render();askPerf()});
  $('#ad_pf').onclick=perfModal;
  $('#bk').onclick=()=>dl('SESTAH_respaldo_'+today()+'.json',JSON.stringify({exportado:new Date().toISOString(),config:CFG,catalogo:CAT,cuestionarios:store.cuestionarios,alertas:store.alertas},null,1));
  $('#ms').onchange=e=>{modServ=e.target.value;render()};
