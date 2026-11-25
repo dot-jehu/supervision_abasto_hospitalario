@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SESTAH · Abasto Yucatán</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Serif:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+/* VOICE: institucional y clínico; herramienta de supervisión para alta dirección
+   IDEA: la cédula oficial de supervisión en papel membretado convertida en formulario vivo
+   PICTURE: el propio cuestionario y las tarjetas de hospital con el estado de cada servicio
+   COLOUR/TYPE: guinda institucional dominante, oro de apoyo, teal para lo validado; Noto Serif en títulos, Noto Sans en texto
+   LAYOUT: barra guinda superior, menú lateral de 10 módulos, contenido en tarjetas de una columna */
+:root{color-scheme:light dark;
+--bg:light-dark(#f6f2ef,#141012);--card:light-dark(#fff,#211a1d);--ink:light-dark(#1d1719,#f1e8ea);--mut:light-dark(#6b6064,#b8abaf);
+--line:light-dark(#e7ddd9,#3a2f33);--g:#611232;--gh:#3a0c1c;--g2:light-dark(#9f2241,#e07a96);--gold:light-dark(#9c7a45,#d6b47e);
+--teal:light-dark(#1e5b4f,#6cc2aa);--field:light-dark(#fcfaf9,#1a1416);--side:light-dark(#faf7f5,#1a1416);--sel:light-dark(#f3e7ea,#3b2229)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Noto Sans",system-ui,sans-serif;overflow-x:clip}
+button,input,select,textarea{font:inherit;color:inherit}
+header.top{position:sticky;top:0;z-index:30;height:56px;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--gh);color:#fff;box-shadow:0 2px 8px #0004}
+.brand{display:flex;align-items:center;gap:10px;font:800 17px/1.1 "Noto Serif",serif}
+.brand em{font-style:normal;color:#d9b57c}
+.brand small{font:700 11px "Noto Sans";letter-spacing:.08em;opacity:.8;padding-left:12px;border-left:1px solid #ffffff40;margin-left:4px}
+.top .sp{flex:1}.conn{font-size:12px;padding:3px 10px;border-radius:99px;background:#ffffff1c;white-space:nowrap}
+.menu-btn{display:none;background:none;border:0;color:#fff;font-size:22px;width:40px;height:40px;cursor:pointer}
+.wrap{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:calc(100vh - 56px)}
+aside{background:var(--side);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:56px;height:calc(100vh - 56px);overflow:auto}
+aside h6{margin:4px 10px 8px;font-size:11px;letter-spacing:.1em;color:var(--mut);font-weight:700}
+aside a{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:10px;color:var(--ink);text-decoration:none;font-size:14.5px;border:1px solid transparent}
+aside a:hover{background:var(--sel)}
+aside a.on{background:var(--card);border-color:var(--line);border-bottom:2px solid var(--g2);font-weight:600;box-shadow:0 1px 3px #0001}
+aside a svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+aside .badge{margin-left:auto;background:var(--g2);color:#fff;font-size:11px;border-radius:99px;padding:0 7px}
+.asfoot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:grid;gap:10px}
+.tgl{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:14px}
+.sw{width:38px;height:22px;border-radius:99px;background:var(--g2);border:0;position:relative;cursor:pointer}
+.sw::after{content:"";position:absolute;top:3px;left:19px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
+.sw.off::after{left:3px}.sw.off{background:#8886}
+.who{display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px;cursor:pointer;background:none;border:0;text-align:left;width:100%}
+.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--sel);color:var(--g2);font-weight:700;font-size:13px;border:1px solid var(--g2);flex:none}
+.who b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.who span{font-size:12px;color:var(--mut)}
+main{padding:20px clamp(14px,3vw,36px) 60px}
+.ph{margin-bottom:16px}.ph .crumb{font-size:13px;color:var(--mut);cursor:pointer;background:none;border:0;padding:0}
+h1{font:800 clamp(26px,3.4vw,36px)/1.1 "Noto Serif",serif;margin:2px 0 4px;text-wrap:balance}
+.ph p{margin:0;color:var(--mut);font-size:14px}
+h2{font:700 19px/1.25 "Noto Serif",serif;margin:0 0 10px}
+h3{font-size:16px;margin:0 0 12px;line-height:1.35}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 2px #0000000a}
+.form{max-width:1000px}
+label{display:grid;gap:4px;font-size:13px;font-weight:600}
+input,select,textarea{width:100%;min-height:42px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--field);font-size:15px;font-weight:400}
+textarea{min-height:70px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--g2);outline-offset:1px}
+input.ro,input[readonly]{background:var(--bg);color:var(--mut)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:14px}
+.g2c{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
+.g4c{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}
+.span2{grid-column:span 2}.span3{grid-column:span 3}.span4{grid-column:1/-1}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.opts.col{grid-template-columns:1fr}
+.opt{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-weight:400;font-size:14.5px;cursor:pointer;min-height:44px;background:var(--field)}
+.opt input{width:18px;height:18px;min-height:0;accent-color:var(--g2);flex:none;margin:0}
+.opt:has(input:checked){border-color:var(--g2);background:var(--sel)}
+.hint{font-size:12.5px;color:var(--mut);margin:8px 0 0}
+.warn{background:light-dark(#fff6e8,#3a2c14);border:1px solid light-dark(#efd3a3,#6b5226);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:10px 0}
+.err{background:light-dark(#fdecef,#3d1820);border:1px solid var(--g2);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:10px 0}
+.err ul{margin:4px 0 0;padding-left:18px}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:8px 18px;border-radius:10px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:600;font-size:14px}
+.btn.pri{background:var(--g2);border-color:var(--g2);color:#fff}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#fff}
+.btn.sm{min-height:34px;padding:4px 12px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.lnk{background:none;border:0;color:var(--g2);cursor:pointer;font-weight:600;font-size:13px;padding:4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.clave,.evt{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--field)}
+.clhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}
+.rk{font-size:12px;padding:2px 10px;border-radius:99px;background:var(--sel);color:var(--g2);font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:12px;text-align:left;color:var(--mut);font-weight:600;padding:8px;border-bottom:1px solid var(--line);vertical-align:bottom}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+.q3 input,.q6 input{min-width:76px;text-align:right}
+.calc{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.bar{position:sticky;bottom:0;background:var(--bg);padding:12px 0;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);z-index:5}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi span{font-size:12.5px;color:var(--mut);display:block}
+.kpi b{font:800 clamp(24px,3vw,32px)/1.15 "Noto Serif",serif;display:block;margin-top:4px}
+.kpi small{font-size:12px;color:var(--mut)}
+.hosp{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.hh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.hh h3{margin:0;text-transform:uppercase;font-size:15.5px}
+.hh .meta{font-size:12.5px;color:var(--mut)}
+.stats{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--mut);margin:10px 0}
+.stats b{color:var(--ink)}
+.svcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
+.svc{display:flex;gap:10px;align-items:center;text-align:left;border:1px dashed var(--line);border-radius:10px;padding:9px 12px;background:var(--field);cursor:pointer;min-height:52px}
+.svc:hover{border-color:var(--g2)}
+.svc .ic{font-size:18px;color:var(--mut);width:18px;text-align:center}
+.svc b{display:block;font-size:14px;font-weight:600}.svc small{font-size:12px}
+.svc.done{border-style:solid}
+.chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.st-Pendiente{color:var(--mut)}
+.st-En_captura{color:#8a6420;background:#bc955c26}
+.st-Enviado{color:#245e8a;background:#3a7fb526}
+.st-En_validación{color:#6a3d8c;background:#8a5ab526}
+.st-Validado{color:var(--teal);background:#1e5b4f22}
+.st-Con_observaciones{color:#b0561a;background:#d9752a26}
+.st-Requiere_seguimiento{color:#fff;background:var(--g2)}
+.lv-Crítica{background:#9f2241;color:#fff}.lv-Alta{background:#d9752a;color:#fff}.lv-Moderada{background:#e8c25a;color:#3a2a00}.lv-Baja{background:#8aa39c;color:#fff}
+.cl-Desabasto{background:#9f2241;color:#fff}.cl-Abasto_insuficiente{background:#e8c25a;color:#3a2a00}.cl-Abasto_suficiente{background:#1e5b4f;color:#fff}
+.cl-Información_pendiente{background:#8886;color:var(--ink)}.cl-No_aplica{background:transparent;border:1px solid var(--line);color:var(--mut)}.cl-Sin_umbral{background:transparent;border:1px dashed var(--mut);color:var(--mut)}
+.sem{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.tag{font-size:11.5px;color:var(--gold);font-weight:700;border:1px solid var(--gold);border-radius:6px;padding:1px 7px}
+.al{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:8px;cursor:pointer;text-align:left;width:100%}
+.al small{color:var(--mut);font-size:12.5px;display:block}
+.hbar{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:13px;margin:6px 0}
+.hbar .tr{height:14px;background:var(--bg);border-radius:4px;overflow:hidden}.hbar .tr i{display:block;height:100%;background:var(--g2)}
+.fig{position:relative;min-height:260px}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 14px;cursor:pointer;font-size:13px;min-height:36px}
+.tabs button.on{background:var(--g2);color:#fff;border-color:var(--g2)}
+#modal{position:fixed;inset:0;background:#0007;z-index:50;display:none;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto}
+#modal.on{display:flex}
+#modal .box{background:var(--card);border-radius:16px;max-width:860px;width:100%;padding:22px 24px;box-shadow:0 20px 60px #0006}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--gh);color:#fff;padding:10px 18px;border-radius:10px;z-index:60;display:none;font-size:14px;max-width:90vw}
+.empty{padding:26px;text-align:center;color:var(--mut);border:1px dashed var(--line);border-radius:12px}
+.dl{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:4px 14px;font-size:14px}.dl dt{color:var(--mut)}.dl dd{margin:0}
+.rep{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.rep .card{margin:0;display:flex;flex-direction:column;gap:8px}.rep .card p{margin:0;font-size:13px;color:var(--mut);flex:1}
+.mx td{text-align:center}.mx td:first-child{text-align:left}
+.mx input{width:20px;height:20px;min-height:0;accent-color:var(--g2)}
+.banner{background:light-dark(#fff6e8,#3a2c14);border-bottom:1px solid light-dark(#efd3a3,#6b5226);padding:8px 18px;font-size:13px;display:none}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}aside{position:fixed;left:0;top:56px;width:260px;z-index:40;transform:translateX(-105%);transition:transform .2s;box-shadow:4px 0 20px #0003}
+aside.open{transform:none}.menu-btn{display:block}.brand small{display:none}.g4c{grid-template-columns:repeat(2,minmax(0,1fr))}.span3{grid-column:span 2}}
+@media(max-width:600px){.g2c,.g4c{grid-template-columns:1fr}.span2,.span3{grid-column:auto}.brand{font-size:14px}.conn{display:none}
+.al{grid-template-columns:1fr}.hbar{grid-template-columns:1fr 60px}.hbar .tr{grid-column:1/-1;grid-row:2}.dl{grid-template-columns:1fr}
+table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mut);font-size:12px}.stack td:empty{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="top">
+<button class="menu-btn" id="menuBtn" aria-label="Menú">☰</button>
+<div class="brand"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="7" fill="#9f2241"/><path d="M15 6c-4 0-7 3-7 7 0 5 7 11 7 11s7-6 7-11c0-4-3-7-7-7z" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 13l2 2 4-4" fill="none" stroke="#d9b57c" stroke-width="2"/></svg>
+<span>Sistema Estatal de Supervisión <em>Territorial del Abasto</em></span><small>IMSS-BIENESTAR · YUCATÁN</small></div>
+<div class="sp"></div><span class="conn" id="conn">Conectando…</span>
+</header>
+<div class="banner" id="banner"></div>
+<div class="wrap">
+<aside id="side">
+<h6>SUPERVISIÓN</h6>
+<nav id="nav"></nav>
+<div class="asfoot">
+<div class="tgl"><span>Tema claro</span><button class="sw" id="themeSw" aria-label="Cambiar tema"></button></div>
+<button class="who" id="whoBtn"><span class="av" id="av">—</span><span><b id="whoN">Sin perfil</b><span id="whoR">Registre su perfil</span></span></button>
+</div>
+</aside>
+<main id="main"></main>
+</div>
+<div id="modal"><div class="box" id="mbox"></div></div>
+<div id="toast"></div>
+
+<script>
+{
+/* ============ CONSTANTES ============ */
+const REG=['Región 1 Mérida','Región 2 Tizimín','Región 3 Ticul','Región 4 Valladolid','Región 5 Tekax'];
+const SERV_CAT=["Urgencias", "Quirófanos", "Tococirugía", "Hospitalización de Ginecología y Obstetricia", "Hospitalización de Cirugía General", "Hospitalización de Medicina Interna", "Hospitalización de Pediatría", "Hospitalización de Traumatología y Ortopedia", "Hospitalización de Neonatología", "Hospitalización Psiquiátrica", "Terapia intensiva de adultos", "Terapia intermedia de adultos", "Unidad de cuidados intensivos obstétricos", "Terapia intensiva pediátrica", "Terapia intermedia pediátrica", "Terapia intensiva neonatal", "Terapia intermedia neonatal", "Hemodiálisis", "Diálisis peritoneal", "Consulta externa", "Laboratorio clínico", "Imagenología", "Banco de sangre y servicio de transfusión", "Endoscopía", "Hemodinamia"];
+const DISP=[{id:'carro',n:'Carro de Reanimación'},{id:'obst',n:'Caja de Emergencia Obstétrica'},{id:'infarto',n:'Caja de Código Infarto'}];
+const ESTADOS=['Pendiente','En captura','Enviado','En validación','Validado','Con observaciones','Requiere seguimiento'];
+const COMPLETOS=['Enviado','En validación','Validado','Con observaciones','Requiere seguimiento'];
+const ROLES=['Coordinador regional','Supervisor de atención médica','Supervisor de enfermería','Monitor estatal','Administrador del sistema'];
+const FREQ=['Diariamente, de lunes a domingo, incluyendo al menos un día de fin de semana','Diariamente, solo lunes a viernes','Tres días a la semana','Dos días a la semana','Un día a la semana','Otro'];
+const LV=['Crítica','Alta','Moderada','Baja'];
+const CLASIF=['Desabasto','Abasto insuficiente','Abasto suficiente','Información pendiente','No aplica','Sin umbral'];
+const DEF={"hospitales": [{"clues": "YNIMB000036", "nombre": "Hospital de Alta Especialidad \"Agustín O'Horán\"", "municipio": "Mérida", "region": "Región 1 Mérida", "nivel": "Tercer nivel", "cartera": ["Urgencias", "Quirófanos", "Tococirugía", "Hospitalización de Ginecología y Obstetricia", "Hospitalización de Cirugía General", "Hospitalización de Medicina Interna", "Hospitalización de Pediatría", "Hospitalización de Traumatología y Ortopedia", "Terapia intensiva de adultos", "Unidad de cuidados intensivos obstétricos", "Terapia intensiva pediátrica", "Terapia intermedia pediátrica", "Terapia intensiva neonatal", "Terapia intermedia neonatal", "Hemodiálisis", "Diálisis peritoneal", "Consulta externa", "Laboratorio clínico", "Imagenología", "Banco de sangre y servicio de transfusión", "Endoscopía", "Hemodinamia"], "fuente": "Cédula de Cartera de Servicios v3, validada 10/07/2026 (PDF)", "notas": ["La cédula registra el nivel como SEGUNDO NIVEL; SESTAH conserva Tercer nivel (alta especialidad). Homologar en la cédula.", "Terapia intermedia de adultos: sin camas (No). Hospitalización de Neonatología (crecimiento y desarrollo): registrada con 0 camas; no se incluye.", "4 quirófanos generales no funcionales de 13."], "validada": true, "validadaFecha": "2026-11-24T22:40:00-06:00", "validadaPor": "DSDS · revisión documental de carteras"}, {"clues": "YNIMB000350", "nombre": "Hospital Psiquiátrico", "municipio": "Mérida", "region": "Región 1 Mérida", "nivel": "Segundo nivel", "cartera": ["Hospitalización Psiquiátrica", "Consulta externa"], "fuente": "Concentrado de carteras de 2.º nivel, hoja \"psiquiatrico\", validada 10/07/2026", "notas": ["La cartera usa la CLUES YNSSA000570; SESTAH usa YNIMB000350. Confirmar CLUES vigente.", "Las 103 camas psiquiátricas están capturadas como no censables; revisar su clasificación.", "No registra urgencias / admisión continua, laboratorio ni imagenología. Si existe atención de urgencias psiquiátricas, debe agregarse a la cédula."], "validada": true, "validadaFecha": "2026-11-24T22:40:00-06:00", "validadaPor": "DSDS · revisión documental de carteras"}, {"clues": "YNIMB000782", "nombre": "Hospital General San Carlos", "municipio": "Tizimín", "region": "Región 2 Tizimín", "nivel": "Segundo nivel", "cartera": ["Urgencias", "Quirófanos", "Tococirugía", "Hospitalización de Ginecología y Obstetricia", "Hospitalización de Cirugía General", "Hospitalización de Medicina Interna", "Hospitalización de Traumatología y Ortopedia", "Hospitalización de Neonatología", "Diálisis peritoneal", "Consulta externa", "Imagenología"], "fuente": "Concentrado de carteras de 2.º nivel, hoja \"san carlos\"", "notas": ["La hoja no registra CLUES ni estatus de validación.", "Laboratorio clínico y servicio de transfusión aparecen en \"No\" pese a contar con quirófanos y tococirugía: probable omisión de captura. Confirmar y, en su caso, agregar.", "Sin camas de hospitalización pediátrica registradas (solo crecimiento y desarrollo, 6 cunas).", "Rayos X funciona pero sin revelado ni enlace; ultrasonido solo en turno matutino."], "validada": true, "validadaFecha": "2026-11-24T22:40:00-06:00", "validadaPor": "DSDS · revisión documental de carteras"}, {"clues": "YNIMB001284", "nombre": "Hospital Comunitario de Ticul", "municipio": "Ticul", "region": "Región 3 Ticul", "nivel": "Segundo nivel", "cartera": ["Urgencias", "Tococirugía", "Consulta externa", "Laboratorio clínico", "Imagenología", "Banco de sangre y servicio de transfusión"], "fuente": "Cartera individual (formato de cumplimiento regulatorio) y concentrado de 2.º nivel, hoja \"hosptal ticul\"", "notas": ["La cartera usa la CLUES YNSSA013481; SESTAH usa YNIMB001284. Confirmar CLUES vigente.", "Sin quirófano general (cirugía general: NA); la cirugía ambulatoria se resuelve en el quirófano de tococirugía.", "Sin camas censables de ginecoobstetricia registradas; la recuperación posparto y posquirúrgica (5 + 5) queda dentro de Tococirugía.", "Discrepancia: el concentrado marca toda la imagenología en \"No\" y la cartera individual registra ultrasonografía \"Sí\". Se incluye Imagenología (ultrasonido).", "Cunero con 4 cunas registrado como servicio adicional; no se incluye como hospitalización neonatal."], "validada": true, "validadaFecha": "2026-11-24T22:40:00-06:00", "validadaPor": "DSDS · revisión documental de carteras"}, {"clues": "YNIMB001255", "nombre": "Hospital General de Valladolid", "municipio": "Valladolid", "region": "Región 4 Valladolid", "nivel": "Segundo nivel", "cartera": ["Urgencias", "Quirófanos", "Tococirugía", "Hospitalización de Ginecología y Obstetricia", "Hospitalización de Cirugía General", "Hospitalización de Medicina Interna", "Hospitalización de Pediatría", "Hospitalización de Traumatología y Ortopedia", "Hospitalización de Neonatología", "Terapia intermedia de adultos", "Terapia intensiva neonatal", "Terapia intermedia neonatal", "Consulta externa", "Laboratorio clínico", "Imagenología", "Banco de sangre y servicio de transfusión"], "fuente": "Cartera de servicios individual del 10/07/2026, contrastada con el concentrado de 2.º nivel", "notas": ["La cartera usa la CLUES YNSSA013440; SESTAH usa YNIMB001255. Confirmar CLUES vigente.", "Terapia intensiva de adultos con 0 camas; solo terapia intermedia (3).", "Riesgos de imagenología: Rayos X simple no funcional desde 2017, tomógrafo no funcional desde 2024; Rayos X portátil limitado a 15 disparos en 24 horas.", "1 quirófano general funcional y 1 no funcional.", "Registra choque obstétrico como servicio adicional; queda dentro de Tococirugía."], "validada": true, "validadaFecha": "2026-11-24T22:40:00-06:00", "validadaPor": "DSDS · revisión documental de carteras"}, {"clues": "YNIMB000024", "nombre": "Hospital General de Tekax", "municipio": "Tekax", "region": "Región 5 Tekax", "nivel": "Segundo nivel", "cartera": ["Urgencias", "Quirófanos", "Tococirugía", "Hospitalización de Ginecología y Obstetricia", "Hospitalización de Cirugía General", "Hospitalización de Medicina Interna", "Hospitalización de Pediatría", "Hospitalización de Traumatología y Ortopedia", "Diálisis peritoneal", "Consulta externa", "Laboratorio clínico", "Imagenología", "Banco de sangre y servicio de transfusión"], "fuente": "Concentrado de carteras de 2.º nivel, hoja \"tekax\", validada 16/07/2026, y cartera individual 2026", "notas": ["No cuenta con terapias intensivas: se retiran Terapia intensiva de adultos, pediátrica y neonatal que aparecían en el prototipo.", "Discrepancia: el concentrado marca laboratorio y transfusión en \"No\", pero la cartera individual registra laboratorio de análisis clínicos y servicio de transfusión hospitalario \"Sí\". Se incluyen.", "Discrepancia en Rayos X: el concentrado lo registra con la mesa no funcional; la cartera individual, como \"No\".", "Urgencias sin triage ni consultorio registrados (20 camas de observación y 2 de choque)."], "validada": true, "validadaFecha": "2026-11-24T22:40:00-06:00", "validadaPor": "DSDS · revisión documental de carteras"}, {"clues": "YNIMB001272", "nombre": "Hospital Comunitario de Peto", "municipio": "Peto", "region": "Región 5 Tekax", "nivel": "Segundo nivel", "cartera": ["Urgencias", "Tococirugía", "Hospitalización de Ginecología y Obstetricia", "Consulta externa", "Laboratorio clínico", "Imagenología"], "fuente": "Concentrado de carteras de 2.º nivel, hoja \"hospital de peto\"", "notas": ["La hoja no registra CLUES ni estatus de validación.", "Sin quirófano general; la atención quirúrgica obstétrica se realiza en el quirófano de tococirugía (1).", "Consulta externa registra \"Ginecología oncológica\"; probable error de captura por Ginecología y obstetricia.", "Depósito de sangre: \"No\" con 1 unidad registrada; confirmar."], "validada": true, "validadaFecha": "2026-11-24T22:40:00-06:00", "validadaPor": "DSDS · revisión documental de carteras"}], "matriz": {"carro": ["*"], "obst": ["Urgencias", "Tococirugía", "Quirófanos", "Hospitalización de Ginecología y Obstetricia", "Terapia intensiva de adultos", "Unidad de cuidados intensivos obstétricos"], "infarto": ["Urgencias"]}, "umbrales": {"surtSuf": null, "surtInsuf": null, "emergSuf": null, "recurrencia": 3, "deterioro": 10}, "modulos": {}};
+const NAV=[['tablero','Tablero','M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'],['cuestionario','Cuestionario de Abasto','M9 3h6v3H9zM6 5h12v16H6zM9 11h6M9 15h4'],['hospitales','Hospitales','M4 21V5h16v16M9 21v-5h6v5M12 8v5M9.5 10.5h5'],['cartera','Cartera de Servicios','M4 6h16M4 12h16M4 18h10'],['catalogo','Catálogo de Insumos','M5 4h14v16H5zM9 8h6M9 12h6M9 16h3'],['alertas','Alertas de Abasto','M12 3l9 16H3zM12 10v4M12 17v.5'],['indicadores','Indicadores','M4 20V10M10 20V4M16 20v-7M22 20H2'],['reportes','Reportes','M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7'],['historial','Historial de Supervisión','M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5'],['admin','Administración del Sistema','M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19 12l2-1-1-3-2 .3-1.5-1.5L17 5l-3-1-1 2h-2L10 4 7 5l.5 2L6 8.5 4 8.3 3 11l2 1v0l-2 1 1 3 2-.3 1.5 1.5L7 19l3 1 1-2h2l1 2 3-1-.5-2 1.5-1.5 2 .3 1-3z']];
+
+/* ============ ESTADO ============ */
+let CFG=clone(DEF),CAT={items:[]};
+const store={cuestionarios:{},alertas:{},perfiles:{}};
+let db=null,usr=null,DL=null,uid=null,canAdmin=false,meName='',mode='init',formOpen=false,formId=null,formVersionDe=null,perfAsked=false;
+const FL={hosp:'',mun:'',reg:'',niv:'',serv:'',per:'hoy',desde:'',hasta:''};
+let indDim='hospital',indGran='diario',alFil={lv:'',st:'abiertas',hosp:''};
+
+/* ============ UTILIDADES ============ */
+function clone(o){return JSON.parse(JSON.stringify(o))}
+const $=s=>document.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
+const addDays=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const num=v=>v===''||v==null||isNaN(Number(v))?null:Number(v);
+const pct=(b,a)=>a>0&&b!=null?b/a*100:null;
+const fp=v=>v==null?'N/A':(Math.round(v*10)/10).toFixed(1)+'%';
+const slug=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'-').slice(0,40);
+const cls=s=>String(s).replace(/ /g,'_');
+const sum=(arr,f)=>{let t=null;arr.forEach(x=>{const v=f(x);if(v!=null)t=(t||0)+v});return t};
+const fmtDT=iso=>{if(!iso)return'';const d=new Date(iso);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',3800)}
+function rid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+const H=c=>CFG.hospitales.find(h=>h.clues===c);
+const Qs=()=>Object.values(store.cuestionarios);
+const As=()=>Object.values(store.alertas);
+const myPerf=()=>store.perfiles[uid||'local']||null;
+const isVal=()=>canAdmin||['Monitor estatal','Administrador del sistema'].includes(myPerf()?.rol);
+const canCfg=()=>canAdmin||mode==='local';
+const perfName=id=>store.perfiles[id]?.nombre||'—';
+const CURP=/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/i;
+function applies(dev,serv){const m=CFG.matriz[dev]||[];return m.includes('*')||m.includes(serv)}
+
+/* ============ PERSISTENCIA ============ */
+function saveLocal(){if(mode!=='local')return;try{localStorage.setItem('sestah_v1',JSON.stringify({CFG,CAT,store}))}catch(e){}}
+function loadLocal(){try{const j=JSON.parse(localStorage.getItem('sestah_v1')||'null');if(j){CFG=Object.assign(clone(DEF),j.CFG);CAT=j.CAT||CAT;Object.assign(store,j.store)}}catch(e){}}
+async function put(col,id,data){
+ if(col==='config'){if(id==='main')CFG=data;else CAT=data}else store[col][id]=data;
+ render(true);
+ if(db){try{await db.collection(col).doc(id).set(data)}catch(e){toast(e.code==='quota_exceeded'?'Capacidad de almacenamiento agotada: depure registros antiguos.':'No se pudo guardar ('+(e.code||'error')+'). Verifique sus permisos.');throw e}}
+ else if(mode==='net'){const r=await fetch('/api/doc',{method:'PUT',headers:{'content-type':'application/json','x-sestah-clave':netKey},body:JSON.stringify({col,id,data})}).catch(()=>null);
+  if(!r||!r.ok){const j=r?await r.json().catch(()=>({})):{};toast('No se pudo guardar: '+(j.error||'sin conexión con el servidor')+'.');throw new Error('net')}}
+ else saveLocal();
+}
+/* ---- Modo servidor (Netlify) ---- */
+let netKey='',netTimer=null;
+function lsGet(k){try{return localStorage.getItem(k)||''}catch(e){return''}}
+function lsSet(k,v){try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}}
+function fileDL(){return{save:async({filename,data})=>{const b=data instanceof Blob?data:new Blob([data]);const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);return{status:'saved'}}}}
+async function netFetch(){const r=await fetch('/api/data',{headers:{'x-sestah-clave':netKey},cache:'no-store'});if(r.status===401)return 401;if(!r.ok)throw new Error('http '+r.status);return r.json()}
+function netApply(j){canAdmin=!!j.admin;const c=j.config||{};if(c.main)CFG=Object.assign(clone(DEF),c.main);if(c.catalogo)CAT=c.catalogo;['cuestionarios','alertas','perfiles'].forEach(k=>store[k]=j[k]||{})}
+function keyModal(msg){
+ openModal(`<h2>Acceso al sistema</h2><p class="hint">Capture la clave de acceso proporcionada por el Departamento de Supervisión y Desarrollo en Salud.</p>${msg?`<div class="err">${esc(msg)}</div>`:''}
+ <label style="margin-top:12px">Clave de acceso<input type="password" id="k_in" autocomplete="current-password"></label><div class="row" style="margin-top:14px"><button class="btn pri" id="k_ok">Ingresar</button></div>`,()=>{
+  const go=()=>{const v=$('#k_in').value.trim();if(!v)return;netKey=v;closeModal();netStart()};$('#k_ok').onclick=go;$('#k_in').onkeydown=e=>{if(e.key==='Enter')go()};$('#k_in').focus()});
+}
+async function netStart(){
+ if(!netKey){keyModal();return}
+ let j;try{j=await netFetch()}catch(e){mode='local';loadLocal();setConn('Modo local');banner('No se pudo conectar con el servidor de la aplicación. Los datos se guardan solo en este navegador.');render();askPerf();return}
+ if(j===401){lsSet('sestah_clave','');netKey='';keyModal('Clave de acceso inválida.');return}
+ lsSet('sestah_clave',netKey);mode='net';netApply(j);setConn(canAdmin?'Conectado · Administración':'Conectado');banner('');render();askPerf();
+ clearInterval(netTimer);netTimer=setInterval(async()=>{if(document.hidden)return;try{const x=await netFetch();if(x!==401){netApply(x);render(true)}}catch(e){setConn('Sin conexión')}},45000);
+}
+function setConn(t){$('#conn').textContent=t}
+function banner(t){const b=$('#banner');b.textContent=t||'';b.style.display=t?'block':'none'}
+
+async function init(){
+ navRender();applyTheme(localStorage.getItem('sestah_theme')||'');
+ if(typeof claude==='undefined'||!claude.use){DL=fileDL();uid=lsGet('sestah_uid')||('u'+rid());lsSet('sestah_uid',uid);netKey=lsGet('sestah_clave');render();netStart();return}
+ render();
+ const [d,u,dl]=await Promise.all([claude.use('db'),claude.use('user'),claude.use('downloads')]);
+ DL=dl;usr=u;
+ if(u){try{uid=await u.id()}catch(e){}try{canAdmin=!!(await u.canEdit())}catch(e){}try{const p=await u.me();meName=p?.name||''}catch(e){}}
+ if(!d||!uid){mode='local';loadLocal();setConn('Modo local');banner('Sin acceso al almacenamiento compartido (inicie sesión). Los datos se guardan solo en este navegador.');render();askPerf();return}
+ db=d;mode='db';setConn('Conectado');subscribe();
+}
+function subscribe(){
+ let got=0;const tm=setTimeout(()=>{if(got<4)banner('No se ha podido confirmar la conexión con el almacenamiento compartido; la información puede estar desactualizada.')},10000);
+ const ok=()=>{got++;if(got>=4){clearTimeout(tm);banner('')}};
+ const fail=e=>{setConn('Sin conexión');banner('Conexión interrumpida ('+(e.code||'error')+'). Recargue la página más tarde.')};
+ db.doc('config/main').onSnapshot(s=>{if(s.exists)CFG=Object.assign(clone(DEF),clone(s.data()));if(!s.metadata.fromCache)ok();render()},fail);
+ db.doc('config/catalogo').onSnapshot(s=>{if(s.exists)CAT=clone(s.data());if(!s.metadata.fromCache)ok();render()},fail);
+ const col=(c,q,last)=>q.onSnapshot(s=>{store[c]={};s.docs.forEach(d=>store[c][d.id]=d.data());if(!s.metadata.fromCache)ok();render();if(last)askPerf()},fail);
+ col('cuestionarios',db.collection('cuestionarios').orderBy('creado','desc').limit(1000));
+ col('alertas',db.collection('alertas').orderBy('creado','desc').limit(1000));
+ col('perfiles',db.collection('perfiles'),true);
+}
+
+/* ============ NAV / TEMA / PERFIL ============ */
+function navRender(){
+ const r=route(),ab=As().filter(a=>a.estado!=='Cerrada'&&a.nivel==='Crítica').length;
+ $('#nav').innerHTML=NAV.map(([k,t,d])=>`<a href="#${k}" class="${r===k?'on':''}"><svg viewBox="0 0 24 24"><path d="${d}"/></svg>${t}${k==='alertas'&&ab?`<span class="badge">${ab}</span>`:''}</a>`).join('');
+ const p=myPerf();
+ $('#whoN').textContent=p?.nombre||meName||'Sin perfil';$('#whoR').textContent=p?(p.rol+' · '+p.region):'Registre su perfil';
+ $('#av').textContent=((p?.nombre||meName||'?').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('')||'?').toUpperCase();
+}
+function applyTheme(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;
+ const dark=t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches);$('#themeSw').classList.toggle('off',dark);$('#themeSw').previousElementSibling.textContent=dark?'Tema oscuro':'Tema claro'}
+$('#themeSw').onclick=()=>{const dark=!$('#themeSw').classList.contains('off');const t=dark?'dark':'light';try{localStorage.setItem('sestah_theme',t)}catch(e){}applyTheme(t)};
+$('#menuBtn').onclick=()=>$('#side').classList.toggle('open');
+$('#whoBtn').onclick=()=>perfModal();
+function askPerf(){if(perfAsked)return;perfAsked=true;if(!myPerf())perfModal()}
+function perfModal(){
+ const p=myPerf()||{nombre:meName,cargo:'',rol:'',region:''};
+ openModal(`<h2>Perfil del supervisor</h2><p class="hint">Se usa para identificar quién captura y valida. Se guarda en el registro institucional de la aplicación.</p>
+ <div class="g2c" style="margin-top:12px"><label>Nombre completo<input id="pf_n" value="${esc(p.nombre)}"></label><label>Cargo<input id="pf_c" value="${esc(p.cargo)}"></label>
+ <label>Rol en el sistema<select id="pf_r"><option value="">Seleccione…</option>${ROLES.map(r=>`<option ${p.rol===r?'selected':''}>${r}</option>`).join('')}</select></label>
+ <label>Región operativa de adscripción<select id="pf_g"><option value="">Seleccione…</option>${[...REG,'Estatal (todas las regiones)'].map(r=>`<option ${p.region===r?'selected':''}>${r}</option>`).join('')}</select></label></div>
+ <div class="row" style="margin-top:16px"><button class="btn pri" id="pf_s">Guardar perfil</button><button class="btn" data-close>Cerrar</button></div>`,()=>{
+  $('#pf_s').onclick=async()=>{const n=$('#pf_n').value.trim(),r=$('#pf_r').value,g=$('#pf_g').value;if(!n||!r||!g){toast('Complete nombre, rol y región.');return}
+   const d={nombre:n,cargo:$('#pf_c').value.trim(),rol:r,region:g,actualizado:new Date().toISOString()};
+   try{await put('perfiles',uid||'local',d);closeModal();toast('Perfil guardado.')}catch(e){}}});
+}
+function openModal(html,bind){$('#mbox').innerHTML=html;$('#modal').classList.add('on');$$('[data-close]',$('#mbox')).forEach(b=>b.onclick=closeModal);bind&&bind()}
+function closeModal(){$('#modal').classList.remove('on')}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+/* ============ RUTEO ============ */
+function route(){const h=location.hash.slice(1);return NAV.some(n=>n[0]===h)?h:'tablero'}
+window.addEventListener('hashchange',()=>{$('#side').classList.remove('open');if(route()!=='cuestionario')formOpen=false;render()});
+function render(fromData){
+ navRender();
+ const r=route();
+ if(r==='cuestionario'&&formOpen&&fromData)return;
+ const V={tablero:vTablero,cuestionario:vCuest,hospitales:vHosp,cartera:vCartera,catalogo:vCatalogo,alertas:vAlertas,indicadores:vInd,reportes:vRep,historial:vHist,admin:vAdmin}[r];
+ const y=window.scrollY;V();if(fromData)window.scrollTo(0,y);
+}
+const ph=(t,s,back)=>`<div class="ph">${back?`<button class="crumb" onclick="history.back()">← ${back}</button>`:''}<h1>${t}</h1><p>${s}</p></div>`;
+
+/* ============ FILTROS / PERIODOS ============ */
+function range(){const t=today();if(FL.per==='hoy')return[t,t];if(FL.per==='7d')return[addDays(t,-6),t];if(FL.per==='semana'){const d=new Date(t+'T12:00:00');const w=(d.getDay()+6)%7;return[addDays(t,-w),t]}
+ if(FL.per==='mes')return[t.slice(0,8)+'01',t];if(FL.per==='30d')return[addDays(t,-29),t];return[FL.desde||'2000-01-01',FL.hasta||t]}
+function hospsF(){return CFG.hospitales.filter(h=>(!FL.hosp||h.clues===FL.hosp)&&(!FL.mun||h.municipio===FL.mun)&&(!FL.reg||h.region===FL.reg)&&(!FL.niv||h.nivel===FL.niv))}
+function recsF(all){const[a,b]=range();const hs=new Set(hospsF().map(h=>h.clues));return Qs().filter(r=>hs.has(r.clues)&&(!FL.serv||r.servicio===FL.serv)&&r.fecha>=a&&r.fecha<=b&&(all||COMPLETOS.includes(r.estado)))}
+function filtersHTML(){
+ const muns=[...new Set(CFG.hospitales.map(h=>h.municipio))],nivs=[...new Set(CFG.hospitales.map(h=>h.nivel))],servs=[...new Set(CFG.hospitales.flatMap(h=>h.cartera))];
+ const o=(arr,v,lab)=>`<option value="">${lab}</option>`+arr.map(x=>`<option value="${esc(x.v??x)}" ${String(x.v??x)===v?'selected':''}>${esc(x.t??x)}</option>`).join('');
+ return `<div class="card"><div class="filters">
+ <label>Hospital<select data-f="hosp">${o(CFG.hospitales.map(h=>({v:h.clues,t:h.nombre})),FL.hosp,'Todos')}</select></label>
+ <label>Municipio<select data-f="mun">${o(muns,FL.mun,'Todos')}</select></label>
+ <label>Región<select data-f="reg">${o(REG,FL.reg,'Todas')}</select></label>
+ <label>Nivel de atención<select data-f="niv">${o(nivs,FL.niv,'Todos')}</select></label>
+ <label>Servicio<select data-f="serv">${o(servs,FL.serv,'Todos')}</select></label>
+ <label>Periodo<select data-f="per">${[['hoy','Hoy'],['semana','Semana en curso'],['7d','Últimos 7 días'],['mes','Mes en curso'],['30d','Últimos 30 días'],['rango','Rango personalizado']].map(([v,t])=>`<option value="${v}" ${FL.per===v?'selected':''}>${t}</option>`).join('')}</select></label>
+ ${FL.per==='rango'?`<label>Desde<input type="date" data-f="desde" value="${esc(FL.desde)}"></label><label>Hasta<input type="date" data-f="hasta" value="${esc(FL.hasta)}"></label>`:''}
+ </div></div>`}
+function bindFilters(){$$('[data-f]').forEach(e=>e.onchange=()=>{FL[e.dataset.f]=e.value;render()})}
+
+/* ============ CÁLCULOS ============ */
+function indic(r){
+ const m=r.q3?.med||{},c=r.q3?.mc||{};const t=k=>{const x=[m[k],c[k]].filter(v=>v!=null);return x.length?x.reduce((a,b)=>a+b,0):null};
+ const ds=r.dispositivos||[];
+ return{cMed:pct(m.B,m.A),eMed:pct(m.D,m.A),cMc:pct(c.B,c.A),eMc:pct(c.D,c.A),cGlob:pct(t('B'),t('A')),eGlob:pct(t('D'),t('A')),
+  emerg:pct(sum(ds,d=>d.B),sum(ds,d=>d.A)),crit:(r.claves||[]).filter(k=>k.prio==='Crítica').length,sinSust:(r.claves||[]).filter(k=>k.sust==='No').length,
+  dif:(r.eventos||[]).filter(e=>e.tipo==='Diferimiento').length,canc:(r.eventos||[]).filter(e=>e.tipo==='Cancelación').length}}
+function clasif(r){
+ if(!r||!COMPLETOS.includes(r.estado))return'Información pendiente';
+ if(r.q1&&r.q1!=='no')return'Desabasto';
+ const g=indic(r).cGlob;if(g==null)return'No aplica';
+ const u=CFG.umbrales.surtSuf;if(u==null)return'Sin umbral';
+ return g>=u?'Abasto suficiente':'Abasto insuficiente'}
+function sem(v,suf,insuf){if(v==null||suf==null)return'';const c=v>=suf?'#1e5b4f':(insuf!=null&&v<insuf)?'#9f2241':'#e8c25a';return`<span class="sem" style="background:${c}"></span>`}
+function critScore(k){return(k.sust==='No'?100:0)+({Crítica:30,Alta:20,Media:10}[k.prio]||0)+({Alto:15,Medio:8,Bajo:2}[k.imp]||0)+Math.min(k.dias||0,30)}
+function lvOf(s){return s>=8?'Crítica':s>=6?'Alta':s>=4?'Moderada':'Baja'}
+function genAlerts(r){
+ const out=[],base={recId:r.id,folio:r.folio,clues:r.clues,hospital:r.hospital,region:r.region,nivel_atencion:r.nivel,servicio:r.servicio,fecha:r.fecha};
+ const add=(tipo,detalle,cr)=>{const s=cr.impacto+cr.sust+cr.tiempo+cr.respuesta;out.push(Object.assign({},base,{tipo,detalle,criterios:cr,score:s,nivel:lvOf(s)}))};
+ (r.claves||[]).forEach(k=>{if(k.prio==='Crítica'||k.exist===0||k.sust==='No'){
+  const cr={impacto:{Alto:3,Medio:2,Bajo:1}[k.imp]||1,sust:k.sust==='No'?3:0,tiempo:(k.dias||0)>=7?3:(k.dias||0)>=3?2:(k.dias||0)>=1?1:0,respuesta:k.exist===0?1:0};
+  add(k.sust==='No'?'Insumo sin sustitución':'Clave crítica sin disponibilidad',`${k.clave||'s/clave'} · ${k.desc||''} (${k.grupo||''}); existencia ${k.exist??'n/r'}, ${k.dias??0} días sin disponibilidad, prioridad ${k.prio||'n/r'}`,cr)}});
+ (r.eventos||[]).forEach(e=>{const cr={impacto:(e.personas||0)>=5?3:(e.personas||0)>=1?2:1,sust:0,tiempo:e.tipo==='Cancelación'?3:2,respuesta:(e.inmed==='Sí'?2:0)+(e.medida?0:1)};
+  add(e.tipo==='Cancelación'?'Cancelación de procedimientos':'Diferimiento de atención',`${e.atencion||''}: ${e.personas??0} persona(s) afectada(s). Motivo: ${e.motivo||''}. Insumo: ${e.insumo||''}`,cr)});
+ (r.dispositivos||[]).forEach(d=>{const p=pct(d.B,d.A);const u=CFG.umbrales.emergSuf??100;if(p!=null&&p<u){
+  const cr={impacto:d.id==='carro'?3:2,sust:0,tiempo:p<50?3:p<80?2:1,respuesta:d.id==='carro'?2:1};add('Insuficiencia en dispositivo de emergencia',`${d.n}: ${fp(p)} de abasto (${d.B}/${d.A} claves). Faltantes: ${d.falt||'n/r'}`,cr)}});
+ const prev=Qs().filter(x=>x.id!==r.id&&x.clues===r.clues&&x.servicio===r.servicio&&COMPLETOS.includes(x.estado)&&x.fecha<=r.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.creado.localeCompare(a.creado));
+ const bad=c=>c==='Desabasto'||c==='Abasto insuficiente';const cur=clasif(r);
+ const n=CFG.umbrales.recurrencia||3;
+ if(bad(cur)&&prev.slice(0,n-1).length>=n-1&&prev.slice(0,n-1).every(x=>bad(clasif(x))))add('Abasto insuficiente recurrente',`${n} capturas consecutivas con ${cur.toLowerCase()} en el servicio.`,{impacto:2,sust:0,tiempo:3,respuesta:1});
+ const g=indic(r).cGlob,pg=prev[0]?indic(prev[0]).cGlob:null;
+ if(g!=null&&pg!=null&&pg-g>=(CFG.umbrales.deterioro||10))add('Deterioro respecto al periodo anterior',`Surtimiento global bajó de ${fp(pg)} (${prev[0].fecha}) a ${fp(g)}.`,{impacto:2,sust:0,tiempo:1,respuesta:1});
+ return out}
+
+/* ============ TABLERO ============ */
+function latestIn(recs,clues,serv){return recs.filter(r=>r.clues===clues&&r.servicio===serv).sort((a,b)=>b.creado.localeCompare(a.creado))[0]}
+function vTablero(){
+ const hs=hospsF(),recs=recsF(true),done=recs.filter(r=>COMPLETOS.includes(r.estado));
+ let tot=0,comp=0;hs.forEach(h=>h.cartera.filter(s=>!FL.serv||s===FL.serv).forEach(s=>{tot++;const l=latestIn(recs,h.clues,s);if(l&&COMPLETOS.includes(l.estado))comp++}));
+ const B=sum(done,r=>sum([r.q3?.med,r.q3?.mc],g=>g?.B)),Aa=sum(done,r=>sum([r.q3?.med,r.q3?.mc],g=>g?.A));
+ const alc=As().filter(a=>a.estado!=='Cerrada'&&a.nivel==='Crítica'&&hs.some(h=>h.clues===a.clues)).length;
+ const crit=sum(done,r=>indic(r).crit)||0,ev=sum(done,r=>(r.eventos||[]).length)||0;
+ $('#main').innerHTML=ph('Tablero de supervisión','Estado de captura y abasto por establecimiento y servicio · IMSS-BIENESTAR Yucatán')+filtersHTML()+
+ `<div class="kpis"><div class="kpi"><span>Servicios con cuestionario completado</span><b>${fp(pct(comp,tot))}</b><small>${comp} de ${tot} servicios en cartera</small></div>
+ <div class="kpi"><span>Surtimiento global de claves</span><b>${sem(pct(B,Aa),CFG.umbrales.surtSuf,CFG.umbrales.surtInsuf)}${fp(pct(B,Aa))}</b><small>${B??0} de ${Aa??0} claves solicitadas</small></div>
+ <div class="kpi"><span>Alertas críticas activas</span><b style="color:var(--g2)">${alc}</b><small>sin cierre validado</small></div>
+ <div class="kpi"><span>Claves críticas faltantes</span><b>${crit}</b><small>reportadas en el periodo</small></div>
+ <div class="kpi"><span>Eventos de diferimiento / cancelación</span><b>${ev}</b><small>sin datos personales</small></div></div>
+ <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Establecimientos</h2><button class="btn pri" onclick="location.hash='cuestionario'">＋ Nuevo cuestionario</button></div>`+
+ (hs.length?hs.map(h=>hospCard(h,recs)).join(''):'<div class="empty">Ningún establecimiento coincide con los filtros.</div>');
+ bindFilters();
+ $$('.svc').forEach(b=>b.onclick=()=>openService(b.dataset.c,b.dataset.s,b.dataset.r));
+}
+function hospCard(h,recs){
+ const sv=h.cartera.filter(s=>!FL.serv||s===FL.serv);let comp=0;
+ const chips=sv.map(s=>{const l=latestIn(recs,h.clues,s);const st=l?l.estado:'Pendiente';if(l&&COMPLETOS.includes(st))comp++;
+  return`<button class="svc ${l?'done':''}" data-c="${esc(h.clues)}" data-s="${esc(s)}" data-r="${esc(l?.id||'')}"><span class="ic">${l?'●':'+'}</span><span><b>${esc(s)}</b><small class="chip st-${cls(st)}">${st}</small>${l&&COMPLETOS.includes(st)?` <small class="chip cl-${cls(clasif(l))}">${clasif(l)}</small>`:''}</span></button>`}).join('');
+ const alc=As().filter(a=>a.clues===h.clues&&a.estado!=='Cerrada'&&a.nivel==='Crítica').length;
+ return`<div class="hosp"><div class="hh"><div><h3>${esc(h.nombre)}</h3><div class="meta">${esc(h.clues)} · ${esc(h.municipio)}, Yucatán · ${esc(h.nivel)} · ${esc(h.region)}</div></div>
+ <div class="meta"><b style="color:var(--ink)">${comp} de ${sv.length}</b> servicios con cuestionario ${h.validada?'':'<span class="tag">Cartera preliminar</span>'}</div></div>
+ <div class="stats"><span>Servicios en cartera: <b>${h.cartera.length}</b></span><span>Completados: <b>${comp}</b></span><span>Pendientes: <b>${sv.length-comp}</b></span><span>Cumplimiento: <b>${fp(pct(comp,sv.length))}</b></span><span>Alertas críticas activas: <b style="color:${alc?'var(--g2)':'inherit'}">${alc}</b></span></div>
+ <div class="svcs">${chips||'<div class="empty">Sin servicios en cartera</div>'}</div></div>`}
+function openService(c,s,id){
+ const r=id&&store.cuestionarios[id];
+ if(r&&r.estado!=='En captura')return detailModal(r);
+ location.hash='cuestionario';formOpen=false;setTimeout(()=>{newForm(r||{clues:c,servicio:s})},0);
+}
+
+/* ============ CUESTIONARIO ============ */
+function vCuest(){
+ if(formOpen)return;
+ const p=myPerf();
+ const drafts=Qs().filter(r=>r.estado==='En captura'&&r.autor===(uid||'local')).sort((a,b)=>b.creado.localeCompare(a.creado));
+ $('#main').innerHTML=ph('Cuestionario de Abasto','Disponibilidad, abasto y necesidades prioritarias por servicio')+
+ `<div class="card"><div class="row" style="justify-content:space-between"><div><h3 style="margin:0">Captura de un nuevo cuestionario</h3><p class="hint">Un cuestionario por servicio. Solo se listan los servicios de la cartera del establecimiento.</p></div><button class="btn pri" id="nf">＋ Nuevo cuestionario</button></div></div>
+ <div class="card"><h3>Mis borradores en captura</h3>${drafts.length?`<table class="stack"><thead><tr><th>Fecha</th><th>Establecimiento</th><th>Servicio</th><th></th></tr></thead><tbody>${drafts.map(r=>`<tr><td>${esc(r.fecha)}</td><td>${esc(r.hospital)}</td><td>${esc(r.servicio)}</td><td><button class="lnk" data-ed="${esc(r.id)}">Continuar captura</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">No tiene borradores pendientes.</div>'}</div>`+
+ (p?'':'<div class="warn">Registre su perfil (nombre, rol y región) antes de capturar. <button class="lnk" id="pfb">Registrar perfil</button></div>');
+ $('#nf').onclick=()=>newForm({});$('#pfb')&&($('#pfb').onclick=perfModal);
+ $$('[data-ed]').forEach(b=>b.onclick=()=>newForm(store.cuestionarios[b.dataset.ed]));
+}
+function newForm(pre,versionDe){
+ formOpen=true;formId=pre&&pre.id&&pre.estado==='En captura'?pre.id:null;formVersionDe=versionDe||pre?.versionDe||null;
+ const p=myPerf();let hl=CFG.hospitales;
+ if(p&&REG.includes(p.region))hl=[...hl.filter(h=>h.region===p.region),...hl.filter(h=>h.region!==p.region)];
+ $('#main').innerHTML=`<div class="form">${ph(formVersionDe?'Corrección de Cuestionario de Abasto':'Nuevo Cuestionario de Abasto','Disponibilidad, abasto y necesidades prioritarias por servicio','Cuestionario de Abasto')}
+ <section class="card"><h3>Datos generales</h3><div class="g2c">
+ <label>1. Fecha de captura<input type="date" id="g_fecha"></label><label>2. Entidad federativa<input value="Yucatán" readonly></label>
+ <label>3. Establecimiento<select id="g_hosp"><option value="">Elija el establecimiento</option>${hl.map(h=>`<option value="${esc(h.clues)}">${esc(h.nombre)}</option>`).join('')}</select></label>
+ <label>4. CLUES<input id="g_clues" readonly class="mono"></label><label>5. Municipio<input id="g_mun" readonly></label><label>6. Región operativa<input id="g_reg" readonly></label><label>7. Nivel de atención<input id="g_niv" readonly></label>
+ <label>8. Servicio<select id="g_serv"><option value="">Elija el servicio</option></select></label>
+ <label>9. Periodicidad de captura<select id="g_per">${['Diaria','Semanal','Mensual','Extraordinaria'].map(x=>`<option>${x}</option>`).join('')}</select></label><label>10. Hora de registro<input type="time" id="g_hora"></label>
+ </div><p class="hint" id="g_cart"></p></section>
+ <section class="card"><h3>1. ¿Actualmente existe desabasto de medicamentos o material de curación prioritarios que el servicio necesita para atender a las personas usuarias?</h3>
+ <div class="opts">${[['no','No'],['med','Sí, medicamentos'],['mc','Sí, material de curación'],['ambos','Sí, ambos']].map(([v,t])=>`<label class="opt"><input type="radio" name="q1" value="${v}">${t}</label>`).join('')}</div></section>
+ <section class="card" id="sec2"><h3>2. Anotar las cinco claves faltantes prioritarias o críticas de material de curación y medicamentos. Priorizar aquellas para las cuales no existe sustitución.</h3><div id="q2body"></div></section>
+ <section class="card"><h3>3. ¿Cuál fue el porcentaje de surtimiento del total de claves solicitadas por el servicio el día de hoy?</h3>
+ <div class="scroll"><table class="q3"><thead><tr><th>Grupo</th><th class="n">Claves solicitadas (A)</th><th class="n">Claves surtidas (B)</th><th class="n">Surtimiento de claves % (C = B/A×100)</th><th class="n">Claves con surtimiento completo (D)</th><th class="n">Surtimiento completo % (E = D/A×100)</th><th class="n">Claves surtidas por debajo del 50% solicitado (F)</th></tr></thead>
+ <tbody>${[['med','Medicamentos'],['mc','Material de curación']].map(([g,t])=>`<tr><td><b>${t}</b></td>${['A','B'].map(k=>`<td><input type="number" min="0" step="1" id="q3_${g}_${k}" inputmode="numeric"></td>`).join('')}<td class="calc" id="q3_${g}_C">—</td><td><input type="number" min="0" step="1" id="q3_${g}_D"></td><td class="calc" id="q3_${g}_E">—</td><td><input type="number" min="0" step="1" id="q3_${g}_F"></td></tr>`).join('')}</tbody></table></div>
+ <p class="hint">Campo vacío = dato no registrado; 0 = cero claves. Se muestra N/A cuando no hubo solicitudes. Se conserva la definición de la ficha técnica institucional del indicador de surtimiento completo cuando exista.</p><div id="q3err"></div></section>
+ <section class="card"><h3>4. ¿El desabasto o abasto insuficiente provocó diferimiento o cancelación de la atención en el servicio el día de hoy?</h3>
+ <div class="opts">${['No','Sí'].map(v=>`<label class="opt"><input type="radio" name="q4" value="${v}">${v}</label>`).join('')}</div><p class="hint">5. Se llena si la respuesta es sí.</p></section>
+ <section class="card" id="sec5"><h3>5. Registro de eventos de diferimiento o cancelación</h3><div class="warn">No capture nombres, CURP, número de expediente ni ningún dato personal de pacientes.</div><div id="q5rows"></div><button class="btn sm" id="addEv">＋ Agregar evento</button></section>
+ <section class="card"><h3>6. ¿Qué porcentaje de abasto se tiene en los insumos de respuesta a emergencias?</h3><div id="q6body"></div></section>
+ <section class="card" id="secMod"></section>
+ ${[7,8].map(n=>`<section class="card"><h3>${n}. ¿Con qué frecuencia le surten ${n===7?'los medicamentos':'el material de curación'}?</h3><div class="opts col">${FREQ.map(f=>`<label class="opt"><input type="radio" name="q${n}" value="${esc(f)}">${esc(f)}</label>`).join('')}</div><label style="margin-top:8px" id="q${n}ol">Describa la frecuencia<input id="q${n}o"></label></section>`).join('')}
+ <section class="card"><h3>Responsable del servicio y persona supervisora</h3><div class="g2c">
+ <label>Nombre del responsable del servicio<input id="f_resp"></label><label>Cargo<input id="f_respC"></label>
+ <label>Nombre de la persona supervisora<input id="f_sup"></label><label>Cargo<input id="f_supC"></label>
+ <label class="span4">Observaciones<textarea id="f_obs"></textarea></label></div><p class="hint">La fecha y hora de envío se registran automáticamente al enviar, junto con la constancia digital de captura.</p></section>
+ <div id="ferr"></div>
+ <div class="bar"><button class="btn pri" id="bSend">Enviar cuestionario</button><button class="btn" id="bDraft">Guardar borrador</button><button class="btn" id="bCancel">Cancelar</button></div></div>`;
+ $('#g_fecha').value=today();$('#g_hora').value=nowHM();$('#f_sup').value=p?.nombre||meName||'';$('#f_supC').value=p?.cargo||'';
+ const f=$('.form');
+ f.addEventListener('change',onFormChange);f.addEventListener('input',onFormInput);
+ $('#addEv').onclick=()=>{addEvt({});};
+ $('#bCancel').onclick=()=>{formOpen=false;location.hash='tablero'};
+ $('#bDraft').onclick=()=>submit(false);$('#bSend').onclick=()=>submit(true);
+ fillForm(pre||{});window.scrollTo(0,0);
+}
+function setHosp(c,serv){
+ const h=H(c);$('#g_hosp').value=h?c:'';$('#g_clues').value=h?.clues||'';$('#g_mun').value=h?.municipio||'';$('#g_reg').value=h?.region||'';$('#g_niv').value=h?.nivel||'';
+ $('#g_serv').innerHTML='<option value="">Elija el servicio</option>'+(h?h.cartera.map(s=>`<option ${s===serv?'selected':''}>${esc(s)}</option>`).join(''):'');
+ $('#g_cart').textContent=h?(h.validada?'Cartera de servicios validada.':'Cartera de servicios preliminar, pendiente de validación institucional.'):'';
+ refreshServ();
+}
+function refreshServ(){renderQ6();renderMods()}
+function q1v(){return $('input[name=q1]:checked')?.value||''}
+function grupos(){const v=q1v();return v==='med'?['Medicamento']:v==='mc'?['Material de curación']:['Medicamento','Material de curación']}
+function renderQ2Vis(){
+ const v=q1v(),on=v&&v!=='no';const b=$('#q2body');
+ if(!on){b.innerHTML=`<p class="hint">${v==='no'?'No aplica: sin desabasto reportado. Continúe con la pregunta 3.':'Se llena después de responder la pregunta 1.'}</p>`;return}
+ if(!$('#q2rows')){b.innerHTML=`<datalist id="dl_cat">${(CAT.items||[]).map(i=>`<option value="${esc(i.clave)}">${esc(i.desc)}</option>`).join('')}</datalist><div id="q2rows"></div><div class="row"><button class="btn sm" id="addCl">＋ Agregar clave</button><span class="hint" id="clCount"></span></div><div id="rank"></div>`;
+  $('#addCl').onclick=()=>addClave({});addClave({})}
+ $$('.f-grupo').forEach(s=>{const v=s.value;s.innerHTML=grupos().map(g=>`<option ${g===v?'selected':''}>${g}</option>`).join('')});
+ rank();
+}
+const clFields=['grupo','clave','desc','pres','exist','cons','nec','dias','prio','sust','sustd','imp','just'];
+function addClave(k){
+ const rows=$('#q2rows');if(rows.children.length>=5){toast('Máximo cinco claves prioritarias.');return}
+ const d=document.createElement('div');d.className='clave';
+ d.innerHTML=`<div class="clhead"><b>Clave prioritaria</b><span class="rk"></span><button class="lnk" data-rm>Quitar</button></div><div class="g4c">
+ <label>Grupo de insumo<select class="f-grupo">${grupos().map(g=>`<option>${g}</option>`).join('')}</select></label>
+ <label>Clave institucional<input class="f-clave mono" list="dl_cat" placeholder="000.000.0000.00"></label>
+ <label class="span2">Descripción<input class="f-desc"></label>
+ <label>Presentación<input class="f-pres"></label>
+ <label>Existencia actual<input class="f-exist" type="number" min="0"></label>
+ <label>Consumo promedio diario<input class="f-cons" type="number" min="0"></label>
+ <label>Necesidad estimada<input class="f-nec" type="number" min="0" placeholder="Sugerida: consumo × 7"></label>
+ <label>Días sin disponibilidad<input class="f-dias" type="number" min="0"></label>
+ <label>Prioridad<select class="f-prio"><option value="">—</option><option>Crítica</option><option>Alta</option><option>Media</option></select></label>
+ <label>¿Existe sustituto terapéutico o funcional?<select class="f-sust"><option value="">—</option><option>Sí</option><option>No</option></select></label>
+ <label>Impacto sobre la atención<select class="f-imp"><option value="">—</option><option value="Alto">Alto: impide la atención</option><option value="Medio">Medio: la retrasa o limita</option><option value="Bajo">Bajo: sin efecto inmediato</option></select></label>
+ <label class="span2">Descripción del sustituto<input class="f-sustd"></label>
+ <label class="span2">Justificación de la prioridad<input class="f-just"></label></div>`;
+ rows.appendChild(d);
+ clFields.forEach(f=>{const e=d.querySelector('.f-'+f);if(k[f]!=null&&e)e.value=k[f]});
+ d.querySelector('[data-rm]').onclick=()=>{d.remove();rank()};rank();
+}
+function readClaves(){return $$('#q2rows .clave').map(d=>{const o={};clFields.forEach(f=>{const v=d.querySelector('.f-'+f).value;o[f]=['exist','cons','nec','dias'].includes(f)?num(v):v.trim()});return o})}
+function rank(){
+ const rows=$$('#q2rows .clave');if(!rows.length){$('#rank')&&($('#rank').innerHTML='');return}
+ const ks=readClaves().map((k,i)=>({k,i,s:critScore(k)})).sort((a,b)=>b.s-a.s);
+ ks.forEach((x,pos)=>{rows[x.i].querySelector('.rk').textContent='Criticidad #'+(pos+1);const sd=rows[x.i].querySelector('.f-sustd').closest('label');sd.style.display=x.k.sust==='Sí'?'':'none'});
+ $('#clCount').textContent=rows.length+' de 5 claves';
+ $('#rank').innerHTML=`<p class="hint"><b>Orden automático por criticidad</b> (sin sustituto pesa más, luego prioridad, impacto y días sin disponibilidad): ${ks.map((x,p)=>`${p+1}. ${esc(x.k.clave||x.k.desc||'clave sin capturar')}${x.k.sust==='No'?' (sin sustituto)':''}`).join(' · ')}</p>`;
+}
+function addEvt(e){
+ const d=document.createElement('div');d.className='evt';
+ d.innerHTML=`<div class="clhead"><b>Evento</b><button class="lnk" data-rm>Quitar</button></div><div class="g4c">
+ <label>Tipo de evento<select class="e-tipo"><option value="">—</option><option>Diferimiento</option><option>Cancelación</option></select></label>
+ <label>Tipo de atención diferida o cancelada<select class="e-atencion"><option value="">—</option>${['Consulta','Cirugía o procedimiento','Estudio diagnóstico','Atención obstétrica','Hospitalización','Tratamiento farmacológico','Otro'].map(x=>`<option>${x}</option>`).join('')}</select></label>
+ <label>Número de personas afectadas<input class="e-personas" type="number" min="0"></label>
+ <label>Fecha y hora<input class="e-fh" type="datetime-local"></label>
+ <label class="span2">Motivo<input class="e-motivo"></label>
+ <label class="span2">Insumo relacionado<input class="e-insumo"></label>
+ <label class="span2">Consecuencia operativa<input class="e-consec"></label>
+ <label class="span2">Medida de contingencia implementada<input class="e-medida"></label>
+ <label>¿Necesidad de intervención inmediata?<select class="e-inmed"><option value="">—</option><option>Sí</option><option>No</option></select></label></div>`;
+ $('#q5rows').appendChild(d);
+ ['tipo','atencion','personas','fh','motivo','insumo','consec','medida','inmed'].forEach(f=>{if(e[f]!=null)d.querySelector('.e-'+f).value=e[f]});
+ if(!e.fh)d.querySelector('.e-fh').value=today()+'T'+nowHM();
+ d.querySelector('[data-rm]').onclick=()=>d.remove();
+}
+function readEvts(){return $$('#q5rows .evt').map(d=>{const o={};['tipo','atencion','personas','fh','motivo','insumo','consec','medida','inmed'].forEach(f=>{const v=d.querySelector('.e-'+f).value;o[f]=f==='personas'?num(v):v.trim()});return o})}
+function renderQ6(prev){
+ const s=$('#g_serv').value,b=$('#q6body');const cur=prev||readDisp();
+ if(!s){b.innerHTML='<p class="hint">Seleccione el servicio para determinar los dispositivos aplicables según la matriz servicio-dispositivo.</p>';return}
+ const ap=DISP.filter(d=>applies(d.id,s));
+ if(!ap.length){b.innerHTML='<p class="hint">No aplica: la matriz servicio-dispositivo no asigna dispositivos de emergencia a este servicio.</p>';return}
+ b.innerHTML=ap.map(d=>{const c=cur.find(x=>x.id===d.id)||{};return`<div class="clave" data-dev="${d.id}"><div class="clhead"><b>${d.n}</b><span class="calc" id="d_${d.id}_P">—</span></div><div class="g4c q6">
+ <label>Claves necesarias (A)<input type="number" min="0" class="d-A" value="${c.A??''}"></label><label>Claves disponibles y suficientes (B)<input type="number" min="0" class="d-B" value="${c.B??''}"></label>
+ <label>Fecha de revisión<input type="date" class="d-fecha" value="${esc(c.fecha||today())}"></label><label>Responsable de verificación<input class="d-resp" value="${esc(c.resp||'')}"></label>
+ <label>Resultado de la revisión<select class="d-res">${['','Completo y funcional','Incompleto','Caducidades detectadas','No disponible'].map(x=>`<option ${c.res===x?'selected':''} value="${x}">${x||'—'}</option>`).join('')}</select></label>
+ <label class="span3">Insumos faltantes<input class="d-falt" value="${esc(c.falt||'')}"></label><label class="span4">Observaciones<input class="d-obs" value="${esc(c.obs||'')}"></label></div></div>`}).join('')+`<p class="hint">Abasto (%) = B / A × 100. Solo se generan registros de los dispositivos aplicables al servicio.</p><div id="q6err"></div>`;
+ calcQ6();
+}
+function readDisp(){return $$('#q6body [data-dev]').map(d=>{const id=d.dataset.dev;return{id,n:DISP.find(x=>x.id===id).n,A:num(d.querySelector('.d-A').value),B:num(d.querySelector('.d-B').value),fecha:d.querySelector('.d-fecha').value,resp:d.querySelector('.d-resp').value.trim(),res:d.querySelector('.d-res').value,falt:d.querySelector('.d-falt').value.trim(),obs:d.querySelector('.d-obs').value.trim()}})}
+function calcQ6(){const er=[];readDisp().forEach(d=>{const p=pct(d.B,d.A);$('#d_'+d.id+'_P').innerHTML=d.A===0?'N/A':d.A==null?'—':sem(p,CFG.umbrales.emergSuf,null)+fp(p);
+ if((d.A??0)<0||(d.B??0)<0)er.push(d.n+': no se admiten valores negativos.');if(d.A!=null&&d.B!=null&&d.B>d.A)er.push(d.n+': B no puede ser mayor que A.')});
+ const e=$('#q6err');if(e)e.innerHTML=er.length?`<div class="err">${er.map(esc).join('<br>')}</div>`:'';return er}
+function renderMods(prev){
+ const s=$('#g_serv').value,m=(CFG.modulos||{})[s]||[],sec=$('#secMod');
+ if(!m.length){sec.style.display='none';sec.innerHTML='';return}
+ const cur=prev||readMods();sec.style.display='';
+ sec.innerHTML=`<h3>Módulo específico del servicio: ${esc(s)}</h3><div class="g2c">${m.map(q=>`<label>${esc(q.texto)}${q.tipo==='sino'?`<select data-mod="${esc(q.id)}"><option value="">—</option><option ${cur[q.id]==='Sí'?'selected':''}>Sí</option><option ${cur[q.id]==='No'?'selected':''}>No</option></select>`:`<input data-mod="${esc(q.id)}" ${q.tipo==='num'?'type="number"':''} value="${esc(cur[q.id]??'')}">`}</label>`).join('')}</div>`;
+}
+function readMods(){const o={};$$('[data-mod]').forEach(e=>o[e.dataset.mod]=e.value);return o}
+function readQ3(){const o={};['med','mc'].forEach(g=>{o[g]={};['A','B','D','F'].forEach(k=>o[g][k]=num($('#q3_'+g+'_'+k).value))});return o}
+function calcQ3(){
+ const q=readQ3(),er=[];
+ [['med','Medicamentos'],['mc','Material de curación']].forEach(([g,t])=>{const x=q[g];
+  ['A','B','D','F'].forEach(k=>{if(x[k]!=null&&(x[k]<0||!Number.isInteger(x[k])))er.push(`${t}: ${k} debe ser un entero no negativo.`)});
+  if(x.A!=null&&x.B!=null&&x.B>x.A)er.push(`${t}: B (surtidas) no puede ser mayor que A (solicitadas).`);
+  if(x.B!=null&&x.D!=null&&x.D>x.B)er.push(`${t}: D (surtimiento completo) no puede ser mayor que B (surtidas).`);
+  if(x.B!=null&&x.F!=null&&x.F>x.B)er.push(`${t}: F no puede ser mayor que B (surtidas).`);
+  if(x.D!=null&&x.F!=null&&x.B!=null&&x.D+x.F>x.B)er.push(`${t}: D + F no puede exceder B.`);
+  const cell=(id,b)=>$('#q3_'+g+'_'+id).innerHTML=x.A===0?'N/A':(x.A==null||b==null)?'—':sem(pct(b,x.A),CFG.umbrales.surtSuf,CFG.umbrales.surtInsuf)+fp(pct(b,x.A));
+  cell('C',x.B);cell('E',x.D)});
+ $('#q3err').innerHTML=er.length?`<div class="err">${er.map(esc).join('<br>')}</div>`:'';return er}
+function toggles(){
+ $('#sec5').style.display=$('input[name=q4]:checked')?.value==='Sí'?'':'none';
+ if($('input[name=q4]:checked')?.value==='Sí'&&!$$('#q5rows .evt').length)addEvt({});
+ [7,8].forEach(n=>$('#q'+n+'ol').style.display=$(`input[name=q${n}]:checked`)?.value==='Otro'?'':'none');
+}
+function onFormChange(e){
+ const t=e.target;
+ if(t.id==='g_hosp')setHosp(t.value,'');
+ else if(t.id==='g_serv')refreshServ();
+ else if(t.name==='q1')renderQ2Vis();
+ else if(t.classList.contains('f-clave')){const it=(CAT.items||[]).find(i=>i.clave===t.value.trim());if(it){const d=t.closest('.clave');d.querySelector('.f-desc').value=d.querySelector('.f-desc').value||it.desc||'';d.querySelector('.f-pres').value=d.querySelector('.f-pres').value||it.pres||'';if(grupos().includes(it.grupo))d.querySelector('.f-grupo').value=it.grupo}}
+ toggles();rank();
+}
+function onFormInput(e){const t=e.target;if(t.id&&t.id.startsWith('q3_'))calcQ3();if(t.closest('#q6body'))calcQ6();if(t.closest('#q2rows'))rank()}
+function fillForm(r){
+ if(r.fecha)$('#g_fecha').value=r.fecha;if(r.hora)$('#g_hora').value=r.hora;if(r.periodicidad)$('#g_per').value=r.periodicidad;
+ setHosp(r.clues||'',r.servicio||'');
+ if(r.dispositivos)renderQ6(r.dispositivos);if(r.modulos)renderMods(r.modulos);
+ if(r.q1){const i=$(`input[name=q1][value="${r.q1}"]`);if(i)i.checked=true}
+ renderQ2Vis();
+ if(r.claves&&r.claves.length&&$('#q2rows')){$('#q2rows').innerHTML='';r.claves.forEach(addClave)}
+ if(r.q3)['med','mc'].forEach(g=>['A','B','D','F'].forEach(k=>{const v=r.q3[g]?.[k];$('#q3_'+g+'_'+k).value=v??''}));
+ if(r.q4){const i=$(`input[name=q4][value="${r.q4}"]`);if(i)i.checked=true}
+ (r.eventos||[]).forEach(addEvt);
+ [7,8].forEach(n=>{const v=r['q'+n];if(v){const i=$$(`input[name=q${n}]`).find(x=>x.value===v);if(i)i.checked=true}$('#q'+n+'o').value=r['q'+n+'otro']||''});
+ const f=r.firmas||{};if(f.resp)$('#f_resp').value=f.resp;if(f.respCargo)$('#f_respC').value=f.respCargo;if(f.sup)$('#f_sup').value=f.sup;if(f.supCargo)$('#f_supC').value=f.supCargo;if(f.obs)$('#f_obs').value=f.obs;
+ calcQ3();toggles();rank();
+}
+function collect(){
+ const c=$('#g_hosp').value,h=H(c);
+ return{fecha:$('#g_fecha').value,hora:$('#g_hora').value,periodicidad:$('#g_per').value,entidad:'Yucatán',clues:c,hospital:h?.nombre||'',municipio:h?.municipio||'',region:h?.region||'',nivel:h?.nivel||'',servicio:$('#g_serv').value,
+  q1:q1v(),claves:q1v()&&q1v()!=='no'?readClaves().filter(k=>k.clave||k.desc).sort((a,b)=>critScore(b)-critScore(a)):[],q3:readQ3(),q4:$('input[name=q4]:checked')?.value||'',eventos:$('input[name=q4]:checked')?.value==='Sí'?readEvts():[],
+  dispositivos:readDisp(),modulos:readMods(),q7:$('input[name=q7]:checked')?.value||'',q7otro:$('#q7o').value.trim(),q8:$('input[name=q8]:checked')?.value||'',q8otro:$('#q8o').value.trim(),
+  firmas:{resp:$('#f_resp').value.trim(),respCargo:$('#f_respC').value.trim(),sup:$('#f_sup').value.trim(),supCargo:$('#f_supC').value.trim(),obs:$('#f_obs').value.trim()}}
+}
+function validate(r,full){
+ const e=[];const h=H(r.clues);
+ if(!r.fecha)e.push('Fecha de captura.');if(!h)e.push('Establecimiento.');
+ if(!r.servicio)e.push('Servicio.');else if(h&&!h.cartera.includes(r.servicio))e.push('El servicio no pertenece a la cartera del establecimiento.');
+ if(!full)return e;
+ if(!r.hora)e.push('Hora de registro.');
+ if(!r.q1)e.push('Pregunta 1: seleccione una opción.');
+ if(r.q1&&r.q1!=='no'){if(!r.claves.length)e.push('Pregunta 2: registre al menos una clave faltante.');
+  r.claves.forEach((k,i)=>{const n='Pregunta 2, clave '+(k.clave||i+1)+': ';if(!k.clave)e.push(n+'clave institucional.');if(!k.desc)e.push(n+'descripción.');if(!k.prio)e.push(n+'prioridad.');if(!k.just)e.push(n+'justificación de la prioridad.');if(!k.sust)e.push(n+'indique si existe sustituto.');if(k.sust==='Sí'&&!k.sustd)e.push(n+'describa el sustituto.');if(!k.imp)e.push(n+'impacto sobre la atención.');
+   ['exist','cons','nec','dias'].forEach(f=>{if(k[f]!=null&&k[f]<0)e.push(n+'sin valores negativos.')})})}
+ calcQ3().forEach(x=>e.push('Pregunta 3: '+x));
+ ['med','mc'].forEach(g=>{const x=r.q3[g];if(x.A==null)e.push('Pregunta 3: capture claves solicitadas (A) de '+(g==='med'?'medicamentos':'material de curación')+' (0 si no hubo).');else if(x.A>0&&(x.B==null||x.D==null||x.F==null))e.push('Pregunta 3: complete B, D y F de '+(g==='med'?'medicamentos':'material de curación')+'.')});
+ if(!r.q4)e.push('Pregunta 4: seleccione una opción.');
+ if(r.q4==='Sí'){if(!r.eventos.length)e.push('Pregunta 5: registre al menos un evento.');r.eventos.forEach((v,i)=>{if(!v.tipo||!v.motivo||!v.atencion||v.personas==null||!v.inmed)e.push('Pregunta 5, evento '+(i+1)+': complete tipo, motivo, tipo de atención, personas afectadas e intervención inmediata.')})}
+ calcQ6().forEach(x=>e.push('Pregunta 6: '+x));
+ r.dispositivos.forEach(d=>{if(d.A==null||d.B==null)e.push('Pregunta 6: capture A y B de '+d.n+'.');if(!d.resp)e.push('Pregunta 6: responsable de verificación de '+d.n+'.');if(!d.res)e.push('Pregunta 6: resultado de la revisión de '+d.n+'.')});
+ [7,8].forEach(n=>{if(!r['q'+n])e.push('Pregunta '+n+': seleccione la frecuencia.');else if(r['q'+n]==='Otro'&&!r['q'+n+'otro'])e.push('Pregunta '+n+': describa la frecuencia.')});
+ if(!r.firmas.resp)e.push('Nombre del responsable del servicio.');if(!r.firmas.sup)e.push('Nombre de la persona supervisora.');
+ const txt=JSON.stringify([r.eventos,r.firmas.obs,r.claves.map(k=>k.just)]);if(CURP.test(txt))e.push('Se detectó un posible CURP en el texto capturado. Elimine cualquier dato personal de pacientes.');
+ return e}
+async function hash(o){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(o)));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return''}}
+async function submit(full){
+ const r=collect(),e=validate(r,full);
+ if(e.length){$('#ferr').innerHTML=`<div class="err"><b>Revise lo siguiente antes de ${full?'enviar':'guardar'}:</b><ul>${e.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;$('#ferr').scrollIntoView({behavior:'smooth',block:'center'});return}
+ $('#ferr').innerHTML='';
+ const now=new Date().toISOString(),id=formId||(r.clues+'_'+slug(r.servicio)+'_'+r.fecha.replace(/-/g,'')+'_'+rid());
+ const old=formId?store.cuestionarios[formId]:null;
+ Object.assign(r,{id,autor:uid||'local',creado:old?.creado||now,actualizado:now,versionDe:formVersionDe||null,estado:full?'Enviado':'En captura',bitacora:[...(old?.bitacora||[]),{estado:full?'Enviado':'En captura',fecha:now,por:uid||'local',nota:full?'Envío del cuestionario':'Borrador guardado'}]});
+ if(full){r.envio=now;r.folio='SESTAH-YUC-'+r.fecha.replace(/-/g,'')+'-'+r.clues+'-'+id.slice(-5).toUpperCase();r.ind=indic(r);r.huella=await hash({...r,bitacora:undefined})}
+ $('#bSend').disabled=$('#bDraft').disabled=true;
+ try{await put('cuestionarios',id,r)}catch(err){$('#bSend').disabled=$('#bDraft').disabled=false;return}
+ if(full){if(formVersionDe&&store.cuestionarios[formVersionDe]){const o=clone(store.cuestionarios[formVersionDe]);o.sustituidoPor=id;o.bitacora=[...(o.bitacora||[]),{estado:o.estado,fecha:now,por:uid||'local',nota:'Corregido mediante nueva versión '+r.folio}];try{await put('cuestionarios',o.id,o)}catch(x){}}
+  const al=genAlerts(r);for(const a of al){const aid='AL-'+rid();try{await put('alertas',aid,Object.assign(a,{id:aid,estado:'Abierta',responsable:'',acciones:'',fechaCompromiso:'',evidencia:'',seguimiento:[],cierre:null,creado:now}))}catch(x){break}}
+  formOpen=false;location.hash='tablero';
+  openModal(`<h2>Constancia digital de captura</h2><dl class="dl"><dt>Folio</dt><dd class="mono">${esc(r.folio)}</dd><dt>Establecimiento</dt><dd>${esc(r.hospital)} (${esc(r.clues)})</dd><dt>Servicio</dt><dd>${esc(r.servicio)}</dd><dt>Fecha y hora de envío</dt><dd>${esc(fmtDT(r.envio))}</dd><dt>Clasificación</dt><dd><span class="chip cl-${cls(clasif(r))}">${clasif(r)}</span></dd><dt>Alertas generadas</dt><dd>${al.length?al.map(a=>`<span class="chip lv-${a.nivel}">${a.nivel}</span> ${esc(a.tipo)}`).join('<br>'):'Ninguna'}</dd><dt>Huella SHA-256</dt><dd class="mono" style="font-size:11px;word-break:break-all">${esc(r.huella)}</dd></dl>
+  <div class="row" style="margin-top:16px"><button class="btn pri" id="cpdf">Descargar constancia (PDF)</button><button class="btn" data-close>Cerrar</button></div>`,()=>{$('#cpdf').onclick=()=>constPDF(r)})
+ }else{toast('Borrador guardado.');formId=id;$('#bSend').disabled=$('#bDraft').disabled=false}
+}
+
+/* ============ DETALLE / VALIDACIÓN ============ */
+function detailModal(r){
+ const i=indic(r),v=isVal();
+ const tq3=['med','mc'].map(g=>{const x=r.q3?.[g]||{};return`<tr><td>${g==='med'?'Medicamentos':'Material de curación'}</td><td class="n">${x.A??'n/r'}</td><td class="n">${x.B??'n/r'}</td><td class="n">${x.A===0?'N/A':fp(pct(x.B,x.A))}</td><td class="n">${x.D??'n/r'}</td><td class="n">${x.A===0?'N/A':fp(pct(x.D,x.A))}</td><td class="n">${x.F??'n/r'}</td></tr>`}).join('');
+ openModal(`<h2>${esc(r.hospital)} · ${esc(r.servicio)}</h2><div class="row" style="margin-bottom:10px"><span class="chip st-${cls(r.estado)}">${esc(r.estado)}</span><span class="chip cl-${cls(clasif(r))}">${clasif(r)}</span>${r.sustituidoPor?'<span class="tag">Sustituido por versión corregida</span>':''}</div>
+ <dl class="dl"><dt>Folio</dt><dd class="mono">${esc(r.folio||'Borrador')}</dd><dt>Fecha / hora</dt><dd>${esc(r.fecha)} ${esc(r.hora)} · ${esc(r.periodicidad)}</dd><dt>CLUES · Región</dt><dd>${esc(r.clues)} · ${esc(r.region)} · ${esc(r.nivel)}</dd>
+ <dt>1. Desabasto</dt><dd>${esc({no:'No',med:'Sí, medicamentos',mc:'Sí, material de curación',ambos:'Sí, ambos'}[r.q1]||'n/r')}</dd><dt>7. Frecuencia medicamentos</dt><dd>${esc(r.q7==='Otro'?r.q7otro:r.q7)}</dd><dt>8. Frecuencia material</dt><dd>${esc(r.q8==='Otro'?r.q8otro:r.q8)}</dd>
+ <dt>Responsable del servicio</dt><dd>${esc(r.firmas?.resp)} ${r.firmas?.respCargo?'('+esc(r.firmas.respCargo)+')':''}</dd><dt>Persona supervisora</dt><dd>${esc(r.firmas?.sup)} ${r.firmas?.supCargo?'('+esc(r.firmas.supCargo)+')':''}</dd><dt>Capturó</dt><dd>${esc(perfName(r.autor))}</dd></dl>
+ ${r.claves?.length?`<h3 style="margin-top:14px">2. Claves faltantes (orden por criticidad)</h3><div class="scroll"><table class="stack"><thead><tr><th>Clave</th><th>Descripción</th><th>Prioridad</th><th class="n">Exist.</th><th class="n">Días</th><th>Sustituto</th><th>Impacto</th></tr></thead><tbody>${r.claves.map(k=>`<tr><td class="mono">${esc(k.clave)}</td><td>${esc(k.desc)}</td><td>${esc(k.prio)}</td><td class="n">${k.exist??'n/r'}</td><td class="n">${k.dias??'n/r'}</td><td>${esc(k.sust)}${k.sustd?': '+esc(k.sustd):''}</td><td>${esc(k.imp)}</td></tr>`).join('')}</tbody></table></div>`:''}
+ <h3 style="margin-top:14px">3. Surtimiento</h3><div class="scroll"><table><thead><tr><th>Grupo</th><th class="n">A</th><th class="n">B</th><th class="n">C</th><th class="n">D</th><th class="n">E</th><th class="n">F</th></tr></thead><tbody>${tq3}</tbody></table></div>
+ ${r.eventos?.length?`<h3 style="margin-top:14px">5. Eventos</h3><table class="stack"><thead><tr><th>Tipo</th><th>Atención</th><th class="n">Personas</th><th>Motivo</th><th>Contingencia</th></tr></thead><tbody>${r.eventos.map(e=>`<tr><td>${esc(e.tipo)}</td><td>${esc(e.atencion)}</td><td class="n">${e.personas??''}</td><td>${esc(e.motivo)}</td><td>${esc(e.medida)}</td></tr>`).join('')}</tbody></table>`:''}
+ <h3 style="margin-top:14px">6. Dispositivos de emergencia</h3>${r.dispositivos?.length?`<table class="stack"><thead><tr><th>Dispositivo</th><th class="n">A</th><th class="n">B</th><th class="n">Abasto</th><th>Resultado</th><th>Faltantes</th></tr></thead><tbody>${r.dispositivos.map(d=>`<tr><td>${esc(d.n)}</td><td class="n">${d.A??''}</td><td class="n">${d.B??''}</td><td class="n">${d.A===0?'N/A':fp(pct(d.B,d.A))}</td><td>${esc(d.res)}</td><td>${esc(d.falt)}</td></tr>`).join('')}</tbody></table>`:'<p class="hint">No aplica al servicio.</p>'}
+ ${r.firmas?.obs?`<p><b>Observaciones:</b> ${esc(r.firmas.obs)}</p>`:''}
+ <h3 style="margin-top:14px">Bitácora de estados</h3><ul style="font-size:13px;padding-left:18px">${(r.bitacora||[]).map(b=>`<li>${esc(fmtDT(b.fecha))} · <b>${esc(b.estado)}</b> · ${esc(perfName(b.por))}${b.nota?' — '+esc(b.nota):''}</li>`).join('')}</ul>
+ ${v&&COMPLETOS.includes(r.estado)&&!r.sustituidoPor?`<div class="card" style="background:var(--field)"><h3>Validación institucional</h3><label>Nota de validación u observaciones<textarea id="vnota"></textarea></label><div class="row" style="margin-top:10px">${['En validación','Validado','Con observaciones','Requiere seguimiento'].map(s=>`<button class="btn sm" data-st="${s}">${s}</button>`).join('')}</div></div>`:''}
+ <div class="row" style="margin-top:14px">${r.folio?'<button class="btn pri" id="cpdf">Constancia (PDF)</button>':''}${r.estado==='Con observaciones'&&!r.sustituidoPor?'<button class="btn gold" id="corr">Capturar versión corregida</button>':''}<button class="btn" data-close>Cerrar</button></div>`,()=>{
+  $('#cpdf')&&($('#cpdf').onclick=()=>constPDF(r));
+  $('#corr')&&($('#corr').onclick=()=>{closeModal();location.hash='cuestionario';setTimeout(()=>{const c=clone(r);delete c.id;newForm(c,r.id)},0)});
+  $$('[data-st]').forEach(b=>b.onclick=async()=>{const s=b.dataset.st,n=$('#vnota').value.trim();if((s==='Con observaciones'||s==='Requiere seguimiento')&&!n){toast('Escriba la observación.');return}
+   const o=clone(r);o.estado=s;o.bitacora=[...(o.bitacora||[]),{estado:s,fecha:new Date().toISOString(),por:uid||'local',nota:n}];try{await put('cuestionarios',o.id,o);closeModal();toast('Estado actualizado: '+s)}catch(e){}});
+ });
+}
+
+/* ============ HOSPITALES / CARTERA / CATÁLOGO ============ */
+function vHosp(){
+ const recs=recsF(true);
+ $('#main').innerHTML=ph('Hospitales','Establecimientos hospitalarios supervisados · 7 unidades en las cinco regiones operativas')+filtersHTML()+
+ `<div class="card scroll"><table class="stack"><thead><tr><th>Establecimiento</th><th>CLUES</th><th>Municipio</th><th>Región operativa</th><th>Nivel</th><th class="n">Servicios</th><th class="n">Completados</th><th class="n">Cumplimiento</th><th class="n">Alertas activas</th></tr></thead><tbody>${hospsF().map(h=>{let c=0;h.cartera.forEach(s=>{const l=latestIn(recs,h.clues,s);if(l&&COMPLETOS.includes(l.estado))c++});const al=As().filter(a=>a.clues===h.clues&&a.estado!=='Cerrada').length;
+ return`<tr><td><b>${esc(h.nombre)}</b></td><td class="mono">${esc(h.clues)}</td><td>${esc(h.municipio)}</td><td>${esc(h.region)}</td><td>${esc(h.nivel)}</td><td class="n">${h.cartera.length}</td><td class="n">${c}</td><td class="n">${fp(pct(c,h.cartera.length))}</td><td class="n">${al}</td></tr>`}).join('')}</tbody></table></div>`;bindFilters()}
+function vCartera(){
+ const ed=canCfg(),allV=CFG.hospitales.every(h=>h.validada);
+ const stOf=h=>h.estado||(h.validada?'Validada':'Preliminar');
+ const stCls={Validada:'st-Validado','En revisión':'st-En_validación',Preliminar:'st-En_captura'};
+ const who=x=>store.perfiles[x]?.nombre||x||'—';
+ $('#main').innerHTML=ph('Cartera de Servicios','Servicios validados por establecimiento; solo estos pueden recibir cuestionario')+
+ (ed?'<div class="warn">Tiene permisos de administración: con <b>Editar cartera y validación</b> puede cambiar servicios, datos del establecimiento, estado, fuente y observaciones. Cada cambio queda en la bitácora con su motivo.</div>':'<div class="warn">Vista de consulta. La modificación y validación de carteras corresponde a la administración del sistema.</div>')+
+ (allV?'':'<div class="warn">Hay carteras preliminares o en revisión: confírmelas contra la cartera de servicios autorizada del establecimiento.</div>')+
+ CFG.hospitales.map((h,hi)=>{const st=stOf(h);return`<div class="card"><div class="hh"><div><h3 style="margin:0">${esc(h.nombre)}</h3><div class="hint" style="margin:0">${esc(h.clues)} · ${esc(h.municipio)} · ${esc(h.region)} · ${esc(h.nivel)}</div></div>
+ <span class="chip ${stCls[st]||'st-En_captura'}">${st==='Validada'?'Cartera validada':st==='En revisión'?'Cartera en revisión':'Cartera preliminar'}</span></div>
+ ${h.fuente?`<p class="hint"><b>Fuente:</b> ${esc(h.fuente)}</p>`:''}${h.validada&&h.validadaFecha?`<p class="hint" style="margin-top:2px"><b>Validó:</b> ${esc(who(h.validadaPor))} · ${esc(String(h.validadaFecha).slice(0,10))}</p>`:''}
+ <div class="row" style="margin-top:10px;gap:6px">${h.cartera.map(s=>`<span class="chip" style="background:var(--sel);color:var(--ink);font-weight:500;padding:4px 10px">${esc(s)}</span>`).join('')||'<span class="hint">Sin servicios.</span>'}</div>
+ <p class="hint">${h.cartera.length} servicio(s) en cartera.</p>
+ ${(h.notas||[]).length?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;font-weight:600">Observaciones de validación (${h.notas.length})</summary><ul style="font-size:13px;padding-left:18px;margin:6px 0">${h.notas.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></details>`:''}
+ ${(h.historial||[]).length?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;font-weight:600">Bitácora de cambios (${h.historial.length})</summary><ul style="font-size:13px;padding-left:18px;margin:6px 0">${h.historial.slice().reverse().map(x=>`<li>${esc(fmtDT(x.fecha))} · ${esc(who(x.por))} · <b>${esc(x.estado)}</b> — ${esc(x.motivo)}${x.cambios?` <span class="hint">(${esc(x.cambios)})</span>`:''}</li>`).join('')}</ul></details>`:''}
+ ${ed?`<div class="row" style="margin-top:12px"><button class="btn sm pri" data-edc="${hi}">Editar cartera y validación</button></div>`:''}</div>`}).join('');
+ if(ed)$$('[data-edc]').forEach(b=>b.onclick=()=>carteraModal(+b.dataset.edc));
+}
+function carteraModal(hi){
+ const h=CFG.hospitales[hi],st=h.estado||(h.validada?'Validada':'Preliminar');
+ const hasRec=Qs().some(r=>r.clues===h.clues);
+ const svc=[...new Set([...SERV_CAT,...h.cartera])];
+ openModal(`<h2>Editar cartera y validación</h2><p class="hint">${esc(h.nombre)}</p>
+ <h3 style="margin-top:14px">Datos del establecimiento</h3><div class="g2c">
+ <label class="span4">Nombre oficial<input id="ce_n" value="${esc(h.nombre)}"></label>
+ <label>CLUES<input id="ce_c" class="mono" value="${esc(h.clues)}" ${hasRec?'disabled':''}></label>
+ <label>Municipio<input id="ce_m" value="${esc(h.municipio)}"></label>
+ <label>Región operativa<select id="ce_r">${REG.map(r=>`<option ${r===h.region?'selected':''}>${r}</option>`).join('')}</select></label>
+ <label>Nivel de atención<select id="ce_v">${['Primer nivel','Segundo nivel','Tercer nivel'].map(v=>`<option ${v===h.nivel?'selected':''}>${v}</option>`).join('')}</select></label></div>
+ ${hasRec?'<p class="hint">La CLUES no se puede cambiar porque ya existen cuestionarios vinculados a este establecimiento.</p>':''}
+ <h3 style="margin-top:14px">Servicios de la cartera</h3><div class="opts" id="ce_s">${svc.map(s=>`<label class="opt"><input type="checkbox" value="${esc(s)}" ${h.cartera.includes(s)?'checked':''}>${esc(s)}</label>`).join('')}</div>
+ <div class="row" style="margin-top:8px"><input id="ce_add" placeholder="Otro servicio identificado en la cartera" style="max-width:360px"><button class="btn sm" id="ce_addb">Agregar servicio</button></div>
+ <h3 style="margin-top:14px">Validación</h3><div class="g2c">
+ <label>Estado de la cartera<select id="ce_e">${['Validada','En revisión','Preliminar'].map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select></label>
+ <label>Fecha de validación<input type="date" id="ce_f" value="${esc(String(h.validadaFecha||'').slice(0,10)||today())}"></label>
+ <label class="span4">Fuente documental<input id="ce_fu" value="${esc(h.fuente||'')}" placeholder="Cédula de cartera de servicios, oficio, fecha"></label>
+ <label class="span4">Observaciones de validación (una por renglón)<textarea id="ce_o" rows="5">${esc((h.notas||[]).join('\n'))}</textarea></label>
+ <label class="span4">Motivo del cambio (obligatorio, queda en la bitácora)<input id="ce_mo"></label></div>
+ <div id="ce_err"></div>
+ <div class="row" style="margin-top:14px"><button class="btn pri" id="ce_ok">Guardar cambios</button><button class="btn" data-close>Cancelar</button></div>`,()=>{
+  $('#ce_addb').onclick=()=>{const v=$('#ce_add').value.trim();if(!v)return;if(![...$$('#ce_s input')].some(i=>i.value===v)){const l=document.createElement('label');l.className='opt';l.innerHTML=`<input type="checkbox" checked value="${esc(v)}">${esc(v)}`;$('#ce_s').appendChild(l)}$('#ce_add').value=''};
+  $('#ce_ok').onclick=async()=>{
+   const e=[],nc=$('#ce_c').value.trim().toUpperCase(),mot=$('#ce_mo').value.trim(),est=$('#ce_e').value;
+   const cart=[...$$('#ce_s input')].filter(i=>i.checked).map(i=>i.value);
+   if(!$('#ce_n').value.trim())e.push('Nombre oficial.');
+   if(!/^[A-Z]{5}\d{6}$/.test(nc))e.push('CLUES con formato válido (5 letras y 6 dígitos).');
+   if(nc!==h.clues&&CFG.hospitales.some(x=>x.clues===nc))e.push('La CLUES ya existe en otro establecimiento.');
+   if(!cart.length)e.push('Al menos un servicio en cartera.');
+   if(est==='Validada'&&!$('#ce_fu').value.trim())e.push('Fuente documental para validar.');
+   if(!mot)e.push('Motivo del cambio.');
+   if(e.length){$('#ce_err').innerHTML=`<div class="err"><b>Revise:</b><ul>${e.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;return}
+   const add=cart.filter(s=>!h.cartera.includes(s)),rem=h.cartera.filter(s=>!cart.includes(s));
+   const cambios=[add.length?'agrega: '+add.join(', '):'',rem.length?'retira: '+rem.join(', '):'',nc!==h.clues?'CLUES '+h.clues+' → '+nc:'',est!==st?'estado '+st+' → '+est:''].filter(Boolean).join('; ');
+   const n=clone(h);Object.assign(n,{nombre:$('#ce_n').value.trim(),clues:nc,municipio:$('#ce_m').value.trim(),region:$('#ce_r').value,nivel:$('#ce_v').value,
+    cartera:[...SERV_CAT.filter(s=>cart.includes(s)),...cart.filter(s=>!SERV_CAT.includes(s))],estado:est,validada:est==='Validada',fuente:$('#ce_fu').value.trim(),
+    notas:$('#ce_o').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)});
+   if(est==='Validada'){n.validadaFecha=$('#ce_f').value||today();n.validadaPor=uid||'local'}
+   n.historial=[...(h.historial||[]),{fecha:new Date().toISOString(),por:uid||'local',estado:est,motivo:mot,cambios}].slice(-50);
+   const cfg=clone(CFG);cfg.hospitales[hi]=n;
+   try{await put('config','main',cfg);closeModal();toast('Cartera actualizada.')}catch(x){}
+  };
+ });
+}
+function vCatalogo(){
+ const ed=canCfg(),items=CAT.items||[];
+ const freq={};Qs().filter(r=>COMPLETOS.includes(r.estado)).forEach(r=>(r.claves||[]).forEach(k=>{const key=k.clave||k.desc;if(!key)return;freq[key]=freq[key]||{clave:k.clave,desc:k.desc,grupo:k.grupo,n:0,sin:0,serv:new Set()};freq[key].n++;if(k.sust==='No')freq[key].sin++;freq[key].serv.add(r.clues+r.servicio)}));
+ const top=Object.values(freq).sort((a,b)=>b.n-a.n).slice(0,15);
+ $('#main').innerHTML=ph('Catálogo de Insumos','Claves institucionales de referencia para la captura y frecuencia de faltantes reportados')+
+ `<div class="card"><h3>Claves faltantes más reportadas</h3>${top.length?`<table class="stack"><thead><tr><th>Clave</th><th>Descripción</th><th>Grupo</th><th class="n">Reportes</th><th class="n">Sin sustituto</th><th class="n">Servicios</th></tr></thead><tbody>${top.map(t=>`<tr><td class="mono">${esc(t.clave)}</td><td>${esc(t.desc)}</td><td>${esc(t.grupo)}</td><td class="n">${t.n}</td><td class="n">${t.sin}</td><td class="n">${t.serv.size}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aún no hay claves faltantes reportadas.</div>'}</div>
+ <div class="card"><h3>Catálogo de referencia (${items.length} claves)</h3>
+ ${ed?`<div class="g4c"><label>Grupo<select id="c_g"><option>Medicamento</option><option>Material de curación</option></select></label><label>Clave institucional<input id="c_k" class="mono"></label><label class="span2">Descripción<input id="c_d"></label><label>Presentación<input id="c_p"></label><label>¿Insumo crítico?<select id="c_c"><option>No</option><option>Sí</option></select></label><div style="align-self:end"><button class="btn pri" id="c_add">Agregar clave</button></div></div>
+ <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Carga masiva (pegar desde Excel)</summary><p class="hint">Una clave por renglón con columnas separadas por tabulador o punto y coma: clave; descripción; presentación; grupo (Medicamento / Material de curación); crítico (Sí/No).</p><textarea id="c_bulk" rows="6"></textarea><button class="btn sm" id="c_load" style="margin-top:8px">Cargar renglones</button></details>`:'<p class="hint">Solo lectura. La administración del catálogo corresponde a personas con permiso de edición.</p>'}
+ <input id="c_q" placeholder="Buscar clave o descripción" style="margin:12px 0;max-width:360px">
+ <div class="scroll" id="c_tbl"></div></div>`;
+ const draw=()=>{const q=$('#c_q').value.toLowerCase();const it=items.filter(i=>!q||(i.clave+' '+i.desc).toLowerCase().includes(q)).slice(0,300);
+  $('#c_tbl').innerHTML=it.length?`<table class="stack"><thead><tr><th>Clave</th><th>Descripción</th><th>Presentación</th><th>Grupo</th><th>Crítico</th>${ed?'<th></th>':''}</tr></thead><tbody>${it.map(i=>`<tr><td class="mono">${esc(i.clave)}</td><td>${esc(i.desc)}</td><td>${esc(i.pres)}</td><td>${esc(i.grupo)}</td><td>${esc(i.critico)}</td>${ed?`<td><button class="lnk" data-del="${esc(i.clave)}">Eliminar</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Catálogo vacío. Cargue el Cuadro Básico y Catálogo institucional vigente.</div>';
+  $$('[data-del]').forEach(b=>b.onclick=()=>{CAT.items=items.filter(x=>x.clave!==b.dataset.del);put('config','catalogo',CAT).catch(()=>{})})};
+ $('#c_q').oninput=draw;draw();
+ if(!ed)return;
+ $('#c_add').onclick=()=>{const k=$('#c_k').value.trim(),d=$('#c_d').value.trim();if(!k||!d){toast('Capture clave y descripción.');return}CAT.items=[...items.filter(x=>x.clave!==k),{clave:k,desc:d,pres:$('#c_p').value.trim(),grupo:$('#c_g').value,critico:$('#c_c').value}];put('config','catalogo',CAT).catch(()=>{})};
+ $('#c_load').onclick=()=>{const rows=$('#c_bulk').value.split(/\r?\n/).map(l=>l.split(/\t|;/).map(x=>x.trim())).filter(r=>r[0]&&r[1]);const m=new Map(items.map(i=>[i.clave,i]));rows.forEach(r=>m.set(r[0],{clave:r[0],desc:r[1],pres:r[2]||'',grupo:/cura/i.test(r[3]||'')?'Material de curación':'Medicamento',critico:/^s/i.test(r[4]||'')?'Sí':'No'}));CAT.items=[...m.values()];if(JSON.stringify(CAT).length>240000){toast('El catálogo excede la capacidad de un documento; cargue solo claves prioritarias.');return}put('config','catalogo',CAT).then(()=>toast(rows.length+' renglones procesados.')).catch(()=>{})};
+}
+
+/* ============ ALERTAS ============ */
+function vAlertas(){
+ let al=As().filter(a=>(!alFil.lv||a.nivel===alFil.lv)&&(!alFil.hosp||a.clues===alFil.hosp)&&(alFil.st==='todas'||(alFil.st==='abiertas'?a.estado!=='Cerrada':a.estado==='Cerrada')));
+ al.sort((a,b)=>LV.indexOf(a.nivel)-LV.indexOf(b.nivel)||b.creado.localeCompare(a.creado));
+ const cnt=lv=>As().filter(a=>a.nivel===lv&&a.estado!=='Cerrada').length;
+ $('#main').innerHTML=ph('Alertas de Abasto','Generadas automáticamente al enviar cada cuestionario; seguimiento hasta cierre validado')+
+ `<div class="kpis">${LV.map(l=>`<div class="kpi"><span><span class="chip lv-${l}">${l}</span> activas</span><b>${cnt(l)}</b></div>`).join('')}</div>
+ <div class="card"><div class="filters"><label>Clasificación<select id="af_lv"><option value="">Todas</option>${LV.map(l=>`<option ${alFil.lv===l?'selected':''}>${l}</option>`).join('')}</select></label>
+ <label>Estado<select id="af_st">${[['abiertas','Activas'],['cerradas','Cerradas'],['todas','Todas']].map(([v,t])=>`<option value="${v}" ${alFil.st===v?'selected':''}>${t}</option>`).join('')}</select></label>
+ <label>Hospital<select id="af_h"><option value="">Todos</option>${CFG.hospitales.map(h=>`<option value="${esc(h.clues)}" ${alFil.hosp===h.clues?'selected':''}>${esc(h.nombre)}</option>`).join('')}</select></label></div>
+ <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600">Criterios de clasificación</summary><p class="hint">Puntaje = impacto asistencial (1–3) + falta de sustituto (0 o 3) + tiempo de desabasto (0–3) + capacidad de respuesta comprometida (0–3). Crítica ≥ 8, Alta 6–7, Moderada 4–5, Baja ≤ 3. Los dispositivos con abasto por debajo del umbral parametrizado (100% si no se ha definido) generan alerta.</p></details></div>
+ ${al.length?al.map(a=>`<button class="al" data-a="${esc(a.id)}"><span class="chip lv-${a.nivel}">${a.nivel}</span><span><b>${esc(a.tipo)}</b><small>${esc(a.hospital)} · ${esc(a.servicio)} · ${esc(a.fecha)}</small><small>${esc(a.detalle)}</small></span><span class="chip ${a.estado==='Cerrada'?'st-Validado':a.estado==='En atención'?'st-En_captura':'st-Requiere_seguimiento'}">${esc(a.estado)}</span></button>`).join(''):'<div class="empty">Sin alertas con los filtros seleccionados.</div>'}`;
+ $('#af_lv').onchange=e=>{alFil.lv=e.target.value;render()};$('#af_st').onchange=e=>{alFil.st=e.target.value;render()};$('#af_h').onchange=e=>{alFil.hosp=e.target.value;render()};
+ $$('[data-a]').forEach(b=>b.onclick=()=>alertModal(store.alertas[b.dataset.a]));
+}
+function alertModal(a){
+ const closed=a.estado==='Cerrada',v=isVal();
+ openModal(`<h2>${esc(a.tipo)}</h2><div class="row" style="margin-bottom:10px"><span class="chip lv-${a.nivel}">${a.nivel} · puntaje ${a.score}</span><span class="chip st-${closed?'Validado':'En_captura'}">${esc(a.estado)}</span></div>
+ <dl class="dl"><dt>Establecimiento</dt><dd>${esc(a.hospital)} (${esc(a.clues)}) · ${esc(a.region)}</dd><dt>Servicio</dt><dd>${esc(a.servicio)}</dd><dt>Fecha del reporte</dt><dd>${esc(a.fecha)} · folio ${esc(a.folio)}</dd><dt>Detalle</dt><dd>${esc(a.detalle)}</dd>
+ <dt>Criterios</dt><dd>Impacto ${a.criterios?.impacto} · Sustitución ${a.criterios?.sust} · Tiempo ${a.criterios?.tiempo} · Respuesta ${a.criterios?.respuesta}</dd></dl>
+ <div class="g2c" style="margin-top:14px"><label>Responsable asignado<input id="a_r" value="${esc(a.responsable)}" ${closed?'disabled':''}></label><label>Fecha compromiso<input type="date" id="a_f" value="${esc(a.fechaCompromiso)}" ${closed?'disabled':''}></label>
+ <label class="span4">Acciones inmediatas<textarea id="a_ac" ${closed?'disabled':''}>${esc(a.acciones)}</textarea></label><label class="span4">Evidencia documental (descripción, número de oficio, vale o remisión)<textarea id="a_ev" ${closed?'disabled':''}>${esc(a.evidencia)}</textarea></label></div>
+ <h3 style="margin-top:14px">Seguimiento</h3><ul style="font-size:13px;padding-left:18px">${(a.seguimiento||[]).map(s=>`<li>${esc(fmtDT(s.fecha))} · ${esc(perfName(s.por))}: ${esc(s.nota)}</li>`).join('')||'<li>Sin notas.</li>'}</ul>
+ ${closed?`<p><b>Cierre validado:</b> ${esc(fmtDT(a.cierre?.fecha))} por ${esc(perfName(a.cierre?.por))} — ${esc(a.cierre?.nota)}</p>`:`<label>Nueva nota de seguimiento<input id="a_n"></label>
+ ${v?'<label style="margin-top:10px">Resumen de cierre (requerido para cerrar)<textarea id="a_c"></textarea></label>':''}`}
+ <div class="row" style="margin-top:14px">${closed?'':`<button class="btn pri" id="a_s">Guardar seguimiento</button>${v?'<button class="btn gold" id="a_x">Cerrar alerta con validación</button>':''}`}<button class="btn" data-close>Cerrar</button></div>`,()=>{
+  const upd=async(close)=>{const o=clone(a);o.responsable=$('#a_r').value.trim();o.fechaCompromiso=$('#a_f').value;o.acciones=$('#a_ac').value.trim();o.evidencia=$('#a_ev').value.trim();
+   const n=$('#a_n').value.trim();if(n)o.seguimiento=[...(o.seguimiento||[]),{fecha:new Date().toISOString(),por:uid||'local',nota:n}];
+   if(o.estado==='Abierta'&&(o.responsable||o.acciones))o.estado='En atención';
+   if(close){const c=$('#a_c').value.trim();if(!c||!o.evidencia){toast('Para cerrar se requieren resumen de cierre y evidencia.');return}o.estado='Cerrada';o.cierre={fecha:new Date().toISOString(),por:uid||'local',nota:c}}
+   try{await put('alertas',o.id,o);closeModal();toast(close?'Alerta cerrada.':'Seguimiento guardado.')}catch(e){}};
+  $('#a_s')&&($('#a_s').onclick=()=>upd(false));$('#a_x')&&($('#a_x').onclick=()=>upd(true));
+ });
+}
+
+/* ============ INDICADORES ============ */
+function aggr(recs){
+ const g=(f,k)=>sum(recs,r=>r.q3?.[f]?.[k]);const both=k=>sum(recs,r=>sum([r.q3?.med,r.q3?.mc],x=>x?.[k]));
+ const ds=recs.flatMap(r=>r.dispositivos||[]);
+ return{med:pct(g('med','B'),g('med','A')),mc:pct(g('mc','B'),g('mc','A')),comp:pct(both('D'),both('A')),emerg:pct(sum(ds,d=>d.B),sum(ds,d=>d.A)),
+  crit:sum(recs,r=>indic(r).crit)||0,sin:sum(recs,r=>indic(r).sinSust)||0,afect:new Set(recs.filter(r=>(r.q1&&r.q1!=='no')||(r.eventos||[]).length).map(r=>r.clues+'|'+r.servicio)).size,
+  dif:sum(recs,r=>indic(r).dif)||0,canc:sum(recs,r=>indic(r).canc)||0,n:recs.length}}
+function cobertura(){const hs=hospsF(),all=recsF(true);let t=0,c=0,hv=0;hs.forEach(h=>{let ok=0,val=0;const sv=h.cartera.filter(s=>!FL.serv||s===FL.serv);sv.forEach(s=>{t++;const l=latestIn(all,h.clues,s);if(l&&COMPLETOS.includes(l.estado)){c++;ok++;if(l.estado==='Validado')val++}});if(ok&&val===ok)hv++});return{serv:pct(c,t),hosp:pct(hv,hs.length),c,t,hv,hn:hs.length}}
+function freqDist(recs,k){const m={};recs.forEach(r=>{const v=r[k]==='Otro'?'Otro':r[k];if(v)m[v]=(m[v]||0)+1});return m}
+function vInd(){
+ const recs=recsF(),a=aggr(recs),cv=cobertura(),U=CFG.umbrales;
+ const clc={};CLASIF.forEach(c=>clc[c]=0);const all=recsF(true);
+ hospsF().forEach(h=>h.cartera.filter(s=>!FL.serv||s===FL.serv).forEach(s=>{const l=latestIn(all,h.clues,s);clc[l?clasif(l):'Información pendiente']++}));
+ const fq=(k)=>{const d=freqDist(recs,k),t=Object.values(d).reduce((x,y)=>x+y,0);return FREQ.map(f=>`<div class="hbar"><span>${esc(f.replace('Diariamente, ','Diario, '))}</span><span class="tr"><i style="width:${t?(d[f]||0)/t*100:0}%"></i></span><span class="n">${d[f]||0}</span></div>`).join('')};
+ const K=[['1. Surtimiento de medicamentos',fp(a.med),sem(a.med,U.surtSuf,U.surtInsuf)],['2. Surtimiento de material de curación',fp(a.mc),sem(a.mc,U.surtSuf,U.surtInsuf)],['3. Surtimiento completo',fp(a.comp),sem(a.comp,U.surtSuf,U.surtInsuf)],['4. Disponibilidad de insumos de emergencia',fp(a.emerg),sem(a.emerg,U.emergSuf,null)],
+  ['5. Claves críticas faltantes',a.crit,''],['6. Claves sin sustitución',a.sin,''],['7. Servicios afectados',a.afect,''],['8. Eventos de diferimiento',a.dif,''],['9. Eventos de cancelación',a.canc,''],['11. Servicios con cuestionario completado',fp(cv.serv),''],['12. Hospitales con información validada',fp(cv.hosp),'']];
+ const dims={hospital:r=>r.hospital,servicio:r=>r.servicio,region:r=>r.region,nivel:r=>r.nivel};
+ const groups={};recs.forEach(r=>{const k=dims[indDim](r);(groups[k]=groups[k]||[]).push(r)});
+ const gk=Object.keys(groups).sort((x,y)=>indDim==='hospital'?(groups[x][0].nivel.localeCompare(groups[y][0].nivel)||x.localeCompare(y)):x.localeCompare(y));
+ $('#main').innerHTML=ph('Indicadores','Calculados automáticamente sobre cuestionarios enviados; los borradores no se consideran')+filtersHTML()+
+ (U.surtSuf==null?'<div class="warn">Los umbrales del semáforo no están parametrizados. Capture los valores aprobados institucionalmente en Administración del Sistema; mientras tanto no se colorean indicadores ni se distingue abasto suficiente de insuficiente.</div>':'')+
+ `<div class="kpis">${K.map(k=>`<div class="kpi"><span>${k[0]}</span><b>${k[2]}${k[1]}</b></div>`).join('')}</div>
+ <div class="card"><h3>Clasificación del abasto por servicio (último registro del periodo)</h3><div class="row">${CLASIF.filter(c=>c!=='Sin umbral'||clc[c]).map(c=>`<span class="chip cl-${cls(c)}" style="font-size:13px;padding:6px 12px">${c}: ${clc[c]}</span>`).join('')}</div></div>
+ <div class="g2c"><div class="card"><h3>10. Frecuencia de surtimiento · medicamentos</h3>${fq('q7')}</div><div class="card"><h3>10. Frecuencia de surtimiento · material de curación</h3>${fq('q8')}</div></div>
+ <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Tendencia del surtimiento</h3><div class="tabs" style="margin:0">${[['diario','Diario'],['semanal','Semanal'],['mensual','Mensual']].map(([v,t])=>`<button data-gr="${v}" class="${indGran===v?'on':''}">${t}</button>`).join('')}</div></div><div class="fig" id="trend"><svg></svg></div><p class="hint">Medicamentos (guinda), material de curación (oro) y surtimiento completo (teal). Puntos con al menos un cuestionario.</p></div>
+ <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Comparativo</h3><div class="tabs" style="margin:0">${[['hospital','Por hospital'],['servicio','Por servicio'],['region','Por región'],['nivel','Por nivel']].map(([v,t])=>`<button data-dim="${v}" class="${indDim===v?'on':''}">${t}</button>`).join('')}</div></div>
+ ${indDim==='hospital'?'<p class="hint">Ordenado por nivel de atención: compare preferentemente entre establecimientos del mismo nivel y con servicios equivalentes.</p>':''}
+ <div class="scroll"><table class="stack"><thead><tr><th>${{hospital:'Hospital',servicio:'Servicio',region:'Región',nivel:'Nivel'}[indDim]}</th>${indDim==='hospital'?'<th>Nivel</th>':''}<th class="n">Cuest.</th><th class="n">Surt. med.</th><th class="n">Surt. mat. cur.</th><th class="n">Surt. completo</th><th class="n">Emergencias</th><th class="n">Claves críticas</th><th class="n">Sin sustituto</th><th class="n">Diferim.</th><th class="n">Cancel.</th></tr></thead>
+ <tbody>${gk.map(k=>{const x=aggr(groups[k]);return`<tr><td><b>${esc(k)}</b></td>${indDim==='hospital'?`<td>${esc(groups[k][0].nivel)}</td>`:''}<td class="n">${x.n}</td><td class="n">${sem(x.med,U.surtSuf,U.surtInsuf)}${fp(x.med)}</td><td class="n">${sem(x.mc,U.surtSuf,U.surtInsuf)}${fp(x.mc)}</td><td class="n">${fp(x.comp)}</td><td class="n">${sem(x.emerg,U.emergSuf,null)}${fp(x.emerg)}</td><td class="n">${x.crit}</td><td class="n">${x.sin}</td><td class="n">${x.dif}</td><td class="n">${x.canc}</td></tr>`}).join('')||'<tr><td colspan="11"><div class="empty">Sin cuestionarios enviados en el periodo.</div></td></tr>'}</tbody></table></div></div>`;
+ bindFilters();
+ $$('[data-dim]').forEach(b=>b.onclick=()=>{indDim=b.dataset.dim;render()});$$('[data-gr]').forEach(b=>b.onclick=()=>{indGran=b.dataset.gr;render()});
+ drawTrend(recs);
+}
+function bucket(f){if(indGran==='mensual')return f.slice(0,7);if(indGran==='semanal'){const d=new Date(f+'T12:00:00');const w=(d.getDay()+6)%7;return addDays(f,-w)}return f}
+function drawTrend(recs){
+ const box=$('#trend'),s=box.querySelector('svg');const by={};recs.forEach(r=>{const k=bucket(r.fecha);(by[k]=by[k]||[]).push(r)});
+ const ks=Object.keys(by).sort().slice(-30),ser=ks.map(k=>aggr(by[k]));
+ const draw=()=>{const W=box.clientWidth,Hh=box.clientHeight,L=40,R=12,T=14,B=30;if(!ks.length){s.innerHTML=`<text x="${W/2}" y="${Hh/2}" text-anchor="middle" fill="currentColor" opacity=".6" font-size="13">Sin datos en el periodo</text>`;return}
+  const x=i=>L+(ks.length===1?(W-L-R)/2:i*(W-L-R)/(ks.length-1)),y=v=>T+(100-v)*(Hh-T-B)/100;
+  const line=(f,c)=>{let d='';ser.forEach((p,i)=>{const v=p[f];if(v==null)return;d+=(d?'L':'M')+x(i)+','+y(v)});return`<path d="${d}" fill="none" stroke="${c}" stroke-width="2.2"/>`+ser.map((p,i)=>p[f]==null?'':`<circle cx="${x(i)}" cy="${y(p[f])}" r="3.2" fill="${c}"><title>${esc(ks[i])}: ${fp(p[f])}</title></circle>`).join('')};
+  const U=CFG.umbrales.surtSuf;
+  s.innerHTML=[0,25,50,75,100].map(v=>`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity=".12"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="currentColor" opacity=".6">${v}%</text>`).join('')+
+  (U!=null?`<line x1="${L}" x2="${W-R}" y1="${y(U)}" y2="${y(U)}" stroke="#1e5b4f" stroke-dasharray="5 4"/><text x="${W-R}" y="${y(U)-5}" text-anchor="end" font-size="11" fill="#1e5b4f">umbral ${U}%</text>`:'')+
+  line('med','#9f2241')+line('mc','#bc955c')+line('comp','#1e5b4f')+
+  ks.map((k,i)=>{const step=Math.ceil(ks.length/(W<520?4:8));return i%step&&i!==ks.length-1?'':`<text x="${x(i)}" y="${Hh-10}" text-anchor="middle" font-size="11" fill="currentColor" opacity=".7">${esc(indGran==='mensual'?k:k.slice(5))}</text>`}).join('')};
+ draw();const ro=new ResizeObserver(draw);ro.observe(box);
+}
+
+/* ============ HISTORIAL ============ */
+function vHist(){
+ const recs=recsF(true).sort((a,b)=>b.creado.localeCompare(a.creado));
+ $('#main').innerHTML=ph('Historial de Supervisión','Todos los registros se conservan; las correcciones generan una nueva versión sin sobrescribir la captura original')+filtersHTML()+
+ `<div class="card scroll"><table class="stack"><thead><tr><th>Fecha</th><th>Folio</th><th>Establecimiento</th><th>Servicio</th><th>Estado</th><th>Clasificación</th><th class="n">Surt. global</th><th class="n">Alertas</th><th>Capturó</th><th></th></tr></thead><tbody>${recs.map(r=>`<tr><td>${esc(r.fecha)}</td><td class="mono" style="font-size:12px">${esc(r.folio||'—')}</td><td>${esc(r.hospital)}</td><td>${esc(r.servicio)}</td><td><span class="chip st-${cls(r.estado)}">${esc(r.estado)}</span>${r.sustituidoPor?' <span class="tag">v. anterior</span>':''}${r.versionDe?' <span class="tag">corrección</span>':''}</td><td><span class="chip cl-${cls(clasif(r))}">${clasif(r)}</span></td><td class="n">${fp(indic(r).cGlob)}</td><td class="n">${As().filter(a=>a.recId===r.id).length}</td><td>${esc(perfName(r.autor))}</td><td><button class="lnk" data-v="${esc(r.id)}">${r.estado==='En captura'?'Continuar':'Ver'}</button></td></tr>`).join('')||'<tr><td colspan="10"><div class="empty">Sin registros en el periodo seleccionado. Amplíe el periodo en los filtros.</div></td></tr>'}</tbody></table></div>`;
+ bindFilters();$$('[data-v]').forEach(b=>b.onclick=()=>{const r=store.cuestionarios[b.dataset.v];if(r.estado==='En captura'){location.hash='cuestionario';setTimeout(()=>newForm(r),0)}else detailModal(r)});
+}
+
+/* ============ REPORTES ============ */
+const REPS=[
+ ['diag','Diagnóstico estatal del abasto','Indicadores agregados por región operativa y nivel de atención.'],
+ ['hosp','Abasto por hospital','Surtimiento, emergencias, claves críticas y eventos por establecimiento.'],
+ ['serv','Abasto por servicio','Último cuestionario de cada servicio con su clasificación.'],
+ ['claves','Insumos críticos faltantes','Claves faltantes reportadas, ordenadas por criticidad.'],
+ ['afect','Servicios afectados por desabasto','Servicios con desabasto o con eventos de diferimiento/cancelación.'],
+ ['emerg','Disponibilidad de dispositivos de emergencia','Carro de reanimación, caja obstétrica y código infarto.'],
+ ['hist','Histórico de surtimiento','Serie por periodo de los porcentajes de surtimiento.'],
+ ['comp','Comparativo entre hospitales','Indicadores por establecimiento agrupados por nivel de atención.'],
+ ['alert','Alertas y seguimiento','Alertas generadas, responsables, compromisos y estado.'],
+ ['ejec','Informe ejecutivo para la Coordinación Estatal','Síntesis de indicadores, alertas críticas y servicios prioritarios.']];
+function buildRep(k){
+ const recs=recsF(),U=CFG.umbrales,rows=[];let cols=[];
+ const agRow=(n,x)=>[n,x.n,fp(x.med),fp(x.mc),fp(x.comp),fp(x.emerg),x.crit,x.sin,x.afect,x.dif,x.canc];
+ const agCols=['Agrupador','Cuestionarios','Surt. medicamentos','Surt. material curación','Surt. completo','Insumos emergencia','Claves críticas','Sin sustituto','Servicios afectados','Diferimientos','Cancelaciones'];
+ const grp=f=>{const g={};recs.forEach(r=>{(g[f(r)]=g[f(r)]||[]).push(r)});return g};
+ if(k==='diag'||k==='ejec'){cols=agCols;rows.push(agRow('ESTATAL',aggr(recs)));const gr=grp(r=>r.region);REG.forEach(x=>rows.push(agRow(x,aggr(gr[x]||[]))));const gn=grp(r=>r.nivel);Object.keys(gn).forEach(x=>rows.push(agRow(x,aggr(gn[x]))))}
+ else if(k==='hosp'||k==='comp'){cols=['Nivel',...agCols];const g=grp(r=>r.hospital);Object.keys(g).sort((a,b)=>g[a][0].nivel.localeCompare(g[b][0].nivel)||a.localeCompare(b)).forEach(x=>rows.push([g[x][0].nivel,...agRow(x,aggr(g[x]))]))}
+ else if(k==='serv'){cols=['Hospital','Servicio','Fecha','Estado','Clasificación','Surt. med.','Surt. mat. cur.','Surt. completo','Emergencias','Claves críticas','Eventos'];const all=recsF(true);hospsF().forEach(h=>h.cartera.forEach(s=>{if(FL.serv&&s!==FL.serv)return;const l=latestIn(all,h.clues,s);const i=l?indic(l):{};rows.push([h.nombre,s,l?.fecha||'',l?.estado||'Pendiente',l?clasif(l):'Información pendiente',fp(i.cMed),fp(i.cMc),fp(i.eGlob),fp(i.emerg),i.crit??'',l?(l.eventos||[]).length:''])}))}
+ else if(k==='claves'){cols=['Fecha','Hospital','Servicio','Grupo','Clave','Descripción','Presentación','Existencia','Consumo prom.','Necesidad','Días sin disp.','Prioridad','Sustituto','Desc. sustituto','Impacto','Justificación'];recs.flatMap(r=>(r.claves||[]).map(c=>({r,c}))).sort((a,b)=>critScore(b.c)-critScore(a.c)).forEach(({r,c})=>rows.push([r.fecha,r.hospital,r.servicio,c.grupo,c.clave,c.desc,c.pres,c.exist??'',c.cons??'',c.nec??'',c.dias??'',c.prio,c.sust,c.sustd,c.imp,c.just]))}
+ else if(k==='afect'){cols=['Fecha','Hospital','Servicio','Desabasto (P1)','Claves faltantes','Sin sustituto','Eventos','Tipo de evento','Personas afectadas','Contingencia'];recs.filter(r=>(r.q1&&r.q1!=='no')||(r.eventos||[]).length).forEach(r=>rows.push([r.fecha,r.hospital,r.servicio,{no:'No',med:'Medicamentos',mc:'Material de curación',ambos:'Ambos'}[r.q1]||'',(r.claves||[]).length,indic(r).sinSust,(r.eventos||[]).length,(r.eventos||[]).map(e=>e.tipo+' - '+e.atencion).join(' | '),sum(r.eventos||[],e=>e.personas)??0,(r.eventos||[]).map(e=>e.medida).filter(Boolean).join(' | ')]))}
+ else if(k==='emerg'){cols=['Fecha','Hospital','Servicio','Dispositivo','Claves necesarias (A)','Disponibles y suficientes (B)','Abasto %','Resultado','Responsable','Faltantes','Observaciones'];recs.forEach(r=>(r.dispositivos||[]).forEach(d=>rows.push([d.fecha||r.fecha,r.hospital,r.servicio,d.n,d.A??'',d.B??'',d.A===0?'N/A':fp(pct(d.B,d.A)),d.res,d.resp,d.falt,d.obs])))}
+ else if(k==='hist'){cols=['Periodo','Cuestionarios','Surt. medicamentos','Surt. material curación','Surt. completo','Insumos emergencia'];const g={};recs.forEach(r=>{const b=bucket(r.fecha);(g[b]=g[b]||[]).push(r)});Object.keys(g).sort().forEach(b=>{const x=aggr(g[b]);rows.push([b,x.n,fp(x.med),fp(x.mc),fp(x.comp),fp(x.emerg)])})}
+ else if(k==='alert'){cols=['Fecha','Clasificación','Tipo','Hospital','Servicio','Detalle','Estado','Responsable','Fecha compromiso','Acciones','Evidencia','Cierre'];const[a,b]=range();const hs=new Set(hospsF().map(h=>h.clues));As().filter(x=>hs.has(x.clues)&&x.fecha>=a&&x.fecha<=b).sort((x,y)=>LV.indexOf(x.nivel)-LV.indexOf(y.nivel)).forEach(x=>rows.push([x.fecha,x.nivel,x.tipo,x.hospital,x.servicio,x.detalle,x.estado,x.responsable,x.fechaCompromiso,x.acciones,x.evidencia,x.cierre?fmtDT(x.cierre.fecha)+' '+x.cierre.nota:'']))}
+ const[a,b]=range();return{title:REPS.find(r=>r[0]===k)[1],sub:`Periodo ${a} a ${b} · ${hospsF().length} establecimiento(s)${FL.serv?' · '+FL.serv:''} · generado ${fmtDT(new Date().toISOString())}`,cols,rows:rows.map(r=>r.map(c=>c==null?'':String(c)))}
+}
+function vRep(){
+ $('#main').innerHTML=ph('Reportes','Descarga en Excel, PDF o CSV con los filtros seleccionados')+filtersHTML()+(DL?'':'<div class="warn">Las descargas no están disponibles en esta vista. Abra la aplicación en claude.ai desde un navegador.</div>')+
+ `<div class="rep">${REPS.map(([k,t,d])=>`<div class="card"><h3 style="margin:0">${t}</h3><p>${d}</p><div class="row"><button class="btn sm pri" data-x="${k}" data-fmt="xlsx">Excel</button><button class="btn sm" data-x="${k}" data-fmt="pdf">PDF</button><button class="btn sm" data-x="${k}" data-fmt="csv">CSV</button></div></div>`).join('')}</div>`;
+ bindFilters();$$('[data-x]').forEach(b=>b.onclick=()=>exportRep(b.dataset.x,b.dataset.fmt));
+}
+async function dl(name,data){if(!DL){toast('Descargas no disponibles en esta vista.');return}try{await DL.save({filename:name,data})}catch(e){if(e?.code!=='declined')toast('No se pudo descargar ('+(e?.code||'error')+').')}}
+function fname(t,ext){return'SESTAH_'+slug(t)+'_'+today()+'.'+ext}
+function exportRep(k,f){
+ const R=buildRep(k);
+ if(f==='csv'){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';dl(fname(R.title,'csv'),'﻿'+[[R.title],[R.sub],R.cols,...R.rows].map(r=>r.map(q).join(',')).join('\r\n'));return}
+ if(f==='xlsx'){if(!window.XLSX){toast('Biblioteca de Excel no disponible.');return}const ws=XLSX.utils.aoa_to_sheet([['IMSS-BIENESTAR · Coordinación Estatal Yucatán · Departamento de Supervisión y Desarrollo en Salud'],[R.title],[R.sub],[],R.cols,...R.rows]);ws['!cols']=R.cols.map((c,i)=>({wch:Math.min(45,Math.max(12,c.length+2,...R.rows.map(r=>String(r[i]).length*0.8)))}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Reporte');dl(fname(R.title,'xlsx'),new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})]));return}
+ if(k==='ejec')return ejecPDF(R);
+ const d=pdfDoc(R.title,R.sub,'landscape');d.autoTable({head:[R.cols],body:R.rows.length?R.rows:[[ 'Sin registros en el periodo' ]],startY:34,styles:{fontSize:7.5,cellPadding:1.6},headStyles:{fillColor:[97,18,50]},alternateRowStyles:{fillColor:[248,244,242]},margin:{left:10,right:10}});pdfFoot(d);dl(fname(R.title,'pdf'),d.output('arraybuffer'));
+}
+function pdfDoc(t,sub,o){const{jsPDF}=window.jspdf;const d=new jsPDF({orientation:o,unit:'mm',format:'letter'});const W=d.internal.pageSize.getWidth();
+ d.setFillColor(58,12,28);d.rect(0,0,W,15,'F');d.setFillColor(188,149,92);d.rect(0,15,W,1.2,'F');d.setTextColor(255);d.setFont('helvetica','bold');d.setFontSize(11);d.text('IMSS-BIENESTAR  ·  Coordinación Estatal Yucatán',10,7);
+ d.setFont('helvetica','normal');d.setFontSize(8);d.text('Departamento de Supervisión y Desarrollo en Salud  ·  Sistema Estatal de Supervisión Territorial del Abasto (SESTAH)',10,12);
+ d.setTextColor(97,18,50);d.setFont('helvetica','bold');d.setFontSize(14);d.text(t,10,24);d.setTextColor(90);d.setFont('helvetica','normal');d.setFontSize(8.5);d.text(sub||'',10,29);d.setTextColor(30);return d}
+function pdfFoot(d){const n=d.getNumberOfPages(),W=d.internal.pageSize.getWidth(),Hh=d.internal.pageSize.getHeight();for(let i=1;i<=n;i++){d.setPage(i);d.setFontSize(7.5);d.setTextColor(120);d.text('Documento generado por SESTAH. No contiene datos personales de pacientes.',10,Hh-6);d.text('Página '+i+' de '+n,W-10,Hh-6,{align:'right'})}}
+function ejecPDF(R){
+ if(!window.jspdf){toast('Biblioteca PDF no disponible.');return}
+ const recs=recsF(),a=aggr(recs),cv=cobertura(),d=pdfDoc('Informe ejecutivo del abasto hospitalario',R.sub,'portrait');let y=38;
+ const kp=[['Surtimiento de medicamentos',fp(a.med)],['Surtimiento de material de curación',fp(a.mc)],['Surtimiento completo',fp(a.comp)],['Insumos de emergencia',fp(a.emerg)],['Servicios con cuestionario completado',fp(cv.serv)+` (${cv.c}/${cv.t})`],['Hospitales con información validada',fp(cv.hosp)+` (${cv.hv}/${cv.hn})`],['Claves críticas faltantes',String(a.crit)],['Claves sin sustitución',String(a.sin)],['Servicios afectados',String(a.afect)],['Diferimientos / cancelaciones',a.dif+' / '+a.canc]];
+ d.autoTable({head:[['Indicador','Valor']],body:kp,startY:y,styles:{fontSize:9},headStyles:{fillColor:[97,18,50]},columnStyles:{1:{halign:'right',fontStyle:'bold'}},margin:{left:12,right:12}});y=d.lastAutoTable.finalY+8;
+ const crit=As().filter(x=>x.estado!=='Cerrada'&&(x.nivel==='Crítica'||x.nivel==='Alta')).sort((p,q)=>LV.indexOf(p.nivel)-LV.indexOf(q.nivel)).slice(0,15);
+ d.setFont('helvetica','bold');d.setFontSize(11);d.setTextColor(97,18,50);d.text('Alertas críticas y altas activas',12,y);
+ d.autoTable({head:[['Nivel','Hospital','Servicio','Tipo','Responsable']],body:crit.length?crit.map(x=>[x.nivel,x.hospital,x.servicio,x.tipo,x.responsable||'Sin asignar']):[['—','Sin alertas activas de nivel crítico o alto','','','']],startY:y+3,styles:{fontSize:8},headStyles:{fillColor:[97,18,50]},margin:{left:12,right:12}});y=d.lastAutoTable.finalY+8;
+ d.setFont('helvetica','bold');d.setFontSize(11);d.setTextColor(97,18,50);d.text('Indicadores por región operativa y nivel de atención',12,y);
+ d.autoTable({head:[['Agrupador','Cuest.','Med.','Mat. cur.','Completo','Emerg.','Críticas']],body:R.rows.map(r=>[r[0],r[1],r[2],r[3],r[4],r[5],r[6]]),startY:y+3,styles:{fontSize:8},headStyles:{fillColor:[97,18,50]},margin:{left:12,right:12}});
+ pdfFoot(d);dl(fname('Informe ejecutivo','pdf'),d.output('arraybuffer'));
+}
+function constPDF(r){
+ if(!window.jspdf){toast('Biblioteca PDF no disponible.');return}
+ const d=pdfDoc('Constancia digital de captura','Cuestionario de Abasto por servicio · Folio '+r.folio,'portrait'),i=r.ind||indic(r);
+ d.autoTable({body:[['Folio',r.folio],['Establecimiento',r.hospital],['CLUES',r.clues],['Municipio / Región',r.municipio+' / '+r.region],['Nivel de atención',r.nivel],['Servicio',r.servicio],['Fecha y hora de captura',r.fecha+' '+r.hora+' ('+r.periodicidad+')'],['Fecha y hora de envío',fmtDT(r.envio)],['Clasificación',clasif(r)],
+  ['Surtimiento medicamentos / material',fp(i.cMed)+' / '+fp(i.cMc)],['Surtimiento completo',fp(i.eGlob)],['Insumos de emergencia',fp(i.emerg)],['Claves faltantes registradas',String((r.claves||[]).length)+' ('+i.sinSust+' sin sustituto)'],['Eventos de diferimiento / cancelación',i.dif+' / '+i.canc],['Huella digital SHA-256',r.huella||'']],
+  startY:36,theme:'grid',styles:{fontSize:8.5},columnStyles:{0:{fontStyle:'bold',cellWidth:62,fillColor:[248,244,242]}},margin:{left:14,right:14}});
+ let y=d.lastAutoTable.finalY+28;const W=d.internal.pageSize.getWidth();
+ [[r.firmas?.resp,r.firmas?.respCargo,'Responsable del servicio',14],[r.firmas?.sup,r.firmas?.supCargo,'Persona supervisora',W/2+6]].forEach(([n,c,l,x])=>{d.setDrawColor(97,18,50);d.line(x,y,x+W/2-20,y);d.setFontSize(9);d.setTextColor(30);d.text(n||'',x,y+5);d.setFontSize(8);d.setTextColor(100);d.text((c||'')+' · '+l,x,y+9)});
+ if(r.firmas?.obs){d.setFontSize(8.5);d.setTextColor(30);d.text(d.splitTextToSize('Observaciones: '+r.firmas.obs,W-28),14,y+20)}
+ pdfFoot(d);dl('Constancia_'+r.folio+'.pdf',d.output('arraybuffer'));
+}
+
+/* ============ ADMINISTRACIÓN ============ */
+let modServ='';
+function vAdmin(){
+ const ed=canCfg(),U=CFG.umbrales,dis=ed?'':'disabled';const servs=[...new Set(CFG.hospitales.flatMap(h=>h.cartera))];modServ=modServ||servs[0]||'';
+ $('#main').innerHTML=ph('Administración del Sistema','Parámetros institucionales, matriz servicio-dispositivo, módulos por servicio y perfiles')+
+ (ed?'':'<div class="warn">Vista de solo lectura: los parámetros los modifica el propietario o un editor de la aplicación.</div>')+
+ `<div class="card"><h3>Mi perfil</h3><p>${esc(myPerf()?.nombre||'Sin registrar')} · ${esc(myPerf()?.rol||'')} · ${esc(myPerf()?.region||'')}</p><button class="btn sm" id="ad_pf">Editar perfil</button></div>
+ <div class="card"><h3>Umbrales del semáforo (parámetros institucionales)</h3><p class="hint">Capture únicamente valores aprobados (ficha técnica o lineamiento vigente). Vacío = no parametrizado. El sistema no asume metas normativas.</p>
+ <div class="g4c" style="margin-top:10px"><label>Surtimiento: suficiente desde (%)<input type="number" id="u1" value="${U.surtSuf??''}" ${dis}></label><label>Surtimiento: crítico por debajo de (%)<input type="number" id="u2" value="${U.surtInsuf??''}" ${dis}></label><label>Insumos de emergencia: suficiente desde (%)<input type="number" id="u3" value="${U.emergSuf??''}" ${dis}></label><label>Fuente del parámetro<input id="u6" value="${esc(U.fuente||'')}" ${dis} placeholder="Ficha técnica / oficio"></label>
+ <label>Recurrencia: capturas consecutivas<input type="number" id="u4" value="${U.recurrencia??3}" ${dis}></label><label>Deterioro: caída en puntos porcentuales<input type="number" id="u5" value="${U.deterioro??10}" ${dis}></label></div>
+ ${ed?'<button class="btn pri" id="u_s" style="margin-top:12px">Guardar parámetros</button>':''}</div>
+ <div class="card"><h3>Matriz de correspondencia servicio-dispositivo</h3><div class="scroll"><table class="mx"><thead><tr><th>Servicio</th>${DISP.map(d=>`<th style="text-align:center">${d.n}</th>`).join('')}</tr></thead><tbody>${servs.map(s=>`<tr><td>${esc(s)}</td>${DISP.map(d=>`<td><input type="checkbox" data-mx="${d.id}" value="${esc(s)}" ${applies(d.id,s)?'checked':''} ${dis||((CFG.matriz[d.id]||[]).includes('*')?'disabled':'')}></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+ <label class="opt" style="max-width:420px;margin-top:10px"><input type="checkbox" id="mxAll" ${(CFG.matriz.carro||[]).includes('*')?'checked':''} ${dis}>Carro de Reanimación aplica a todos los servicios</label></div>
+ <div class="card"><h3>Módulos adicionales por servicio</h3><p class="hint">Preguntas complementarias que aparecen solo en el cuestionario del servicio seleccionado.</p>
+ <label style="max-width:360px">Servicio<select id="ms">${servs.map(s=>`<option ${s===modServ?'selected':''}>${esc(s)}</option>`).join('')}</select></label>
+ <ul id="mlist" style="padding-left:18px;font-size:14px">${((CFG.modulos||{})[modServ]||[]).map((q,i)=>`<li>${esc(q.texto)} <small>(${{sino:'Sí/No',num:'Número',texto:'Texto'}[q.tipo]})</small> ${ed?`<button class="lnk" data-mq="${i}">Quitar</button>`:''}</li>`).join('')||'<li>Sin preguntas adicionales.</li>'}</ul>
+ ${ed?`<div class="row"><input id="mq_t" placeholder="Texto de la pregunta" style="max-width:420px"><select id="mq_k" style="max-width:150px"><option value="sino">Sí/No</option><option value="num">Número</option><option value="texto">Texto</option></select><button class="btn sm" id="mq_a">Agregar pregunta</button></div>`:''}</div>
+ <div class="card"><h3>Perfiles registrados</h3><table class="stack"><thead><tr><th>Nombre</th><th>Cargo</th><th>Rol</th><th>Región</th></tr></thead><tbody>${Object.values(store.perfiles).map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.cargo)}</td><td>${esc(p.rol)}</td><td>${esc(p.region)}</td></tr>`).join('')||'<tr><td colspan="4">Sin perfiles.</td></tr>'}</tbody></table></div>
+ <div class="card"><h3>Respaldo y capacidad</h3><p class="hint">${Qs().length} cuestionarios y ${As().length} alertas cargados en esta vista. El almacenamiento admite hasta 25,000 documentos; programe respaldos periódicos.</p><div class="row"><button class="btn sm" id="bk">Descargar respaldo completo (JSON)</button>${mode==='net'?'<button class="btn sm" id="ko">Cerrar sesión en este equipo</button>':''}</div></div>`;
+ $('#ko')&&($('#ko').onclick=()=>{lsSet('sestah_clave','');location.reload()});
+ $('#ad_pf').onclick=perfModal;
+ $('#bk').onclick=()=>dl('SESTAH_respaldo_'+today()+'.json',JSON.stringify({exportado:new Date().toISOString(),config:CFG,catalogo:CAT,cuestionarios:store.cuestionarios,alertas:store.alertas},null,1));
+ $('#ms').onchange=e=>{modServ=e.target.value;render()};
+ if(!ed)return;
+ const save=()=>put('config','main',CFG).then(()=>toast('Configuración guardada.')).catch(()=>{});
+ $('#u_s').onclick=()=>{const g=id=>num($('#'+id).value);const s1=g('u1'),s2=g('u2');if(s1!=null&&s2!=null&&s2>s1){toast('El umbral crítico no puede ser mayor que el de suficiencia.');return}
+  CFG.umbrales={surtSuf:s1,surtInsuf:s2,emergSuf:g('u3'),recurrencia:Math.max(2,g('u4')||3),deterioro:g('u5')||10,fuente:$('#u6').value.trim()};save()};
+ $$('[data-mx]').forEach(c=>c.onchange=()=>{const m=(CFG.matriz[c.dataset.mx]||[]).filter(x=>x!=='*'&&x!==c.value);if(c.checked)m.push(c.value);CFG.matriz[c.dataset.mx]=m;save()});
+ $('#mxAll').onchange=e=>{CFG.matriz.carro=e.target.checked?['*']:[...servs];save()};
+ $$('[data-mq]').forEach(b=>b.onclick=()=>{CFG.modulos[modServ].splice(+b.dataset.mq,1);save()});
+ $('#mq_a').onclick=()=>{const t=$('#mq_t').value.trim();if(!t)return;CFG.modulos=CFG.modulos||{};(CFG.modulos[modServ]=CFG.modulos[modServ]||[]).push({id:'m'+rid(),texto:t,tipo:$('#mq_k').value});save()};
+}
+
+init();
+}
+</script>
+</body>
+</html>

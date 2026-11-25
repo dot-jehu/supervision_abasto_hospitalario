@@ -1,0 +1,9 @@
+{
+  "name": "sestah-abasto-yucatan",
+  "private": true,
+  "type": "module",
+  "description": "Sistema Estatal de Supervisión Territorial del Abasto Hospitalario - IMSS-BIENESTAR Yucatán",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.11"
+  }
+}
